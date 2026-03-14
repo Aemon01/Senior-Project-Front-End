@@ -29,7 +29,7 @@ export default function StudentDashboardPage() {
             justifyContent: "center",
           }}
         >
-          <div style={{ width: 1280 }}>
+          <div style={{ width: 1380 }}>
             <ClientDashboard />
           </div>
         </main>

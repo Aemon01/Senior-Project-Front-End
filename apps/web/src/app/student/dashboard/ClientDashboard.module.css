@@ -1,0 +1,1506 @@
+/* =========================================================
+   0) PAGE + MAIN LAYOUT
+   - โครงหลักของ dashboard
+   - ซ้ายเป็น content หลัก / ขวาเป็น avatar + calendar
+========================================================= */
+html,
+body {
+  overflow-x: hidden;
+}
+
+.dash {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 18px;
+  align-items: start;
+  padding-bottom: 24px;
+  box-sizing: border-box;
+}
+
+.left {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.right {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+/* =========================================================
+   1) BASE CARD + SHARED TITLES
+   - base สำหรับการ์ดทั่วไป
+========================================================= */
+.card {
+  position: relative;
+  background: #fff;
+}
+
+.sectionTitle {
+  font-weight: 800;
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.85);
+}
+
+.cardHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+/* =========================================================
+   2) TOP ROW
+   - รูปโปรไฟล์ + bio/profile card
+   - ปรับให้สมส่วนขึ้นจากของเดิม
+========================================================= */
+.topGrid {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 20px;
+  align-items: stretch;
+}
+
+/* -------------------------
+   2.1 Photo Card
+------------------------- */
+.hiddenFile {
+  display: none;
+}
+
+.photoCard {
+  min-height: 190px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #efefef;
+  border-radius: 6px;
+  background: #fefefe;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+  box-sizing: border-box;
+}
+
+.photoBtn {
+  width: 100%;
+  height: 100%;
+  min-height: 190px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  display: block;
+}
+
+.photoFrame {
+  width: 100%;
+  height: 100%;
+  min-height: 190px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 6px;
+}
+
+.photoPlaceholder {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.02));
+}
+
+.photoImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 190px;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+
+/* -------------------------
+   2.2 Figma-like Bio Box
+------------------------- */
+.bioBox {
+  width: 100%;
+  min-height: 190px;
+  position: relative;
+  text-align: left;
+  font-size: 12px;
+  color: #000;
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+}
+
+.bioBg {
+  position: absolute;
+  inset: 0;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  background-color: #fefefe;
+  border: 1px solid #efefef;
+  box-sizing: border-box;
+}
+
+.bioInformation {
+  position: absolute;
+  top: 22px;
+  left: 30px;
+  right: 86px;
+  bottom: 20px;
+}
+
+.profileName {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  min-height: 30px;
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 1.08;
+  display: flex;
+  align-items: center;
+}
+
+.profileBio {
+  position: absolute;
+  top: 42px;
+  left: 4px;
+  right: 0;
+  min-height: 40px;
+  font-size: 14px;
+  line-height: 1.4;
+  font-family: Inter, Arial, sans-serif;
+  color: rgba(0, 0, 0, 0.78);
+  display: flex;
+  align-items: flex-start;
+}
+
+.profilePhone {
+  position: absolute;
+  top: 108px;
+  left: 4px;
+  width: calc(50% - 18px);
+  min-height: 20px;
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+}
+
+.profileEmail {
+  position: absolute;
+  top: 108px;
+  right: 0;
+  width: calc(50% - 18px);
+  min-height: 20px;
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+}
+
+.profileAddress {
+  position: absolute;
+  top: 138px;
+  left: 4px;
+  width: calc(50% - 18px);
+  min-height: 24px;
+  line-height: 1.3;
+  display: flex;
+  align-items: flex-start;
+  font-size: 12px;
+}
+
+.profileEducation {
+  position: absolute;
+  top: 138px;
+  right: 0;
+  width: calc(50% - 18px);
+  min-height: 20px;
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+}
+
+/* เส้นแบ่งข้อมูล */
+.linesWrap {
+  position: absolute;
+  top: 100px;
+  left: 0;
+  right: 0;
+  height: 50px;
+  pointer-events: none;
+}
+
+.lineTop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.lineBottomLeft {
+  position: absolute;
+  top: 30px;
+  left: 0;
+  width: calc(50% - 14px);
+  height: 1px;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.lineBottomRight {
+  position: absolute;
+  top: 30px;
+  right: 0;
+  width: calc(50% - 14px);
+  height: 1px;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.lineVertical {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  width: 1px;
+  height: 52px;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.editButtonIcon {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 42px;
+  height: 36px;
+  cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, 0.28);
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+}
+
+/* =========================================================
+   3) MID ROW
+   - rank card + skill progress card
+========================================================= */
+.midGrid {
+  display: grid;
+  grid-template-columns: 315px minmax(0, 1fr);
+  gap: 24px;
+  align-items: stretch;
+}
+
+/* -------------------------
+   3.1 Rank Card
+------------------------- */
+.rankCard {
+  padding: 14px 16px 14px;
+  border: 1px solid #efefef;
+  border-radius: 6px;
+  box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.08);
+  background: #fefefe;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.rankTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  margin-bottom: 0px;
+}
+
+.levelWrap {
+  position: relative;
+  width: 290px;
+  height: 74px;
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+}
+
+/* กล่องม่วงพื้นหลัง */
+.levelXpBox {
+  position: absolute;
+  top: 6px;
+  left: 0;
+  width: 250px;
+  height: 56px;
+  border-radius: 3px;
+  background: #cdb4db;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-sizing: border-box;
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.16);
+}
+
+/* ข้อความ xp */
+.levelXpScore {
+  position: absolute;
+  top: 6px;
+  left: 14px;
+  width: 108px;
+  height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #000;
+  text-align: center;
+  line-height: 1;
+}
+
+.levelXpScore span:first-child {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.levelXpScore span:last-child {
+  margin-top: 5px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* กล่องน้ำเงิน */
+.levelBadgeBox {
+  position: absolute;
+  top: 14px;
+  left: 126px;
+  width: 98px;
+  height: 38px;
+}
+
+.levelBadgeBg {
+  position: absolute;
+  inset: 0;
+  border-radius: 2px;
+  background: #457b9d;
+  border: 1px solid #457b9d;
+  box-sizing: border-box;
+  box-shadow: 2px 2px 2px rgba(0, 0, 0, 0.12);
+}
+
+.levelValue {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+  color: #fff;
+}
+
+/* badge ด้านขวา */
+.levelBadgeIcon {
+  position: absolute;
+  top: -1px;
+  left: 210px;
+  width: 70px;
+  height: 70px;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+/* แถวเหรียญ */
+.medalRow {
+  position: relative;
+  margin: 8px 0 18px;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: nowrap;
+  padding: 0px 0 8px;
+}
+
+
+.medalSlot {
+  position: relative;
+  z-index: 1;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+
+.medalImg {
+  position: relative;
+  z-index: 1;
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  display: block;
+  pointer-events: none;
+}
+
+.medalOn {
+  opacity: 1;
+  filter: none;
+}
+
+.medalOff {
+  opacity: 0.38;
+  filter: grayscale(1);
+}
+
+.medalActive {
+  width: 70px;
+  height: 70px;
+  transform: translateY(1px);
+  z-index: 2;
+}
+
+.medalActive::before {
+  top: 42px;
+  width: 46px;
+  height: 10px;
+}
+
+.medalActive .medalImg {
+  width: 62px;
+  height: 62px;
+}
+
+/* tile ล่าง */
+.tileRow {
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: repeat(3, 88px);
+  gap: 10px;
+  align-items: start;
+  justify-content: start;
+}
+
+.tileBtn {
+  position: relative;
+  width: 84px;
+  height: 78px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+/* กรอบหลักด้านหน้า */
+.tileOuter {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 76px;
+  height: 68px;
+  border-radius: 4px;
+  background: #eae2b7;
+  border: 1px solid #111;
+  box-sizing: border-box;
+  z-index: 2;
+}
+
+/* เส้นกรอบที่เยื้องลง/ขวา */
+.tileOuter::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 76px;
+  height: 68px;
+  border-radius: 4px;
+  border: 1px solid #111;
+  background: transparent;
+  box-sizing: border-box;
+  z-index: -1;
+}
+
+/* ไม่ใช้กรอบชั้นในแล้ว */
+.tileInner {
+  display: none;
+}
+
+/* พื้นที่ไอคอน */
+.tileIconWrap {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 46px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.tileIcon {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* label ล่าง */
+.tileLabel {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 15px;
+  min-height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  color: #000;
+  text-transform: lowercase;
+  z-index: 4;
+}
+
+/* hover */
+.tileBtn:hover {
+  transform: translateY(-1px);
+}
+
+.tileBtn:active {
+  transform: translateY(0);
+}
+
+.tileBtn:focus-visible {
+  outline: 2px solid #1270b0;
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+/* -------------------------
+   3.2 Skill Card
+------------------------- */
+.skillCard {
+  padding: 14px 18px 12px;
+  border: 1px solid #efefef;
+  border-radius: 6px;
+  box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.08);
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  min-height: 210px;
+  background: #fefefe;
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.skillHead {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  margin-bottom: 8px;
+}
+
+.skillTitle {
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+  font-size: 18px;
+  font-weight: 500;
+  color: #000;
+  line-height: 1.1;
+}
+
+.skillViewport {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+/* ตัว scroll จริง */
+.skillScroll {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 2px 10px;
+  scrollbar-width: thin;               /* Firefox */
+  scrollbar-color: #8a8a8a #efefef;    /* Firefox */
+}
+
+/* Chrome / Edge / Safari */
+.skillScroll::-webkit-scrollbar {
+  height: 8px;
+}
+
+.skillScroll::-webkit-scrollbar-track {
+  background: #efefef;
+  border-radius: 999px;
+  border: 1px solid #000;
+}
+
+.skillScroll::-webkit-scrollbar-thumb {
+  background: #8a8a8a;
+  border-radius: 999px;
+  border: 1px solid #000;
+}
+
+.skillRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 20px;
+  width: max-content;
+  min-width: 100%;
+  padding: 0 4px;
+}
+
+.skillCol {
+  width: 52px;
+  min-width: 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+/* % ด้านบน */
+.skillPct {
+  min-height: 18px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 500;
+  color: #000;
+  text-align: center;
+}
+
+/* แท่งกราฟ */
+.skillTube {
+  width: 20px;
+  height: 112px;
+  border-radius: 3px;
+  border: 1px solid #000;
+  background: #fff;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.skillFill {
+  width: 100%;
+  background: #8b8b8b;
+  border-radius: 0;
+  min-height: 0;
+}
+
+/* label */
+.skillLabel {
+  margin-top: 6px;
+  width: 100%;
+  font-size: 11px;
+  line-height: 1.15;
+  color: #000;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+
+/* =========================================================
+   4) SPLIT CARDS
+   - activity | mission
+   - completion | xp
+========================================================= */
+
+/* -------------------------
+   4.1 Activity | Mission
+------------------------- */
+.splitCard {
+  padding: 16px;
+  border: 1.4px solid rgba(0, 0, 0, 0.14);
+  border-radius: 5px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+  display: grid;
+  grid-template-columns: 1fr 1px 420px;
+  gap: 18px;
+  align-items: start;
+}
+
+.splitVR {
+  width: 1px;
+  background: rgba(0, 0, 0, 0.18);
+  align-self: stretch;
+  margin: 4px 0 10px;
+}
+
+.activityCards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.activityItem {
+  border-radius: 5px;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  background: rgba(248, 245, 242, 0.75);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.06);
+  padding: 12px;
+  min-height: 110px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.activityTitle {
+  font-size: 11px;
+  font-weight: 900;
+  color: rgba(0, 0, 0, 0.76);
+}
+
+.activitySub {
+  font-size: 10px;
+  color: rgba(0, 0, 0, 0.55);
+  margin-top: 4px;
+}
+
+.activityBottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.activityXp {
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.star {
+  font-size: 14px;
+}
+
+.viewAll {
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  background: #fff;
+  border-radius: 5px;
+  padding: 6px 12px;
+  font-size: 11px;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* Mission list */
+.missionList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.missionItem {
+  border-radius: 5px;
+  border: 1px solid rgba(120, 90, 160, 0.25);
+  background: rgba(170, 140, 210, 0.18);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.06);
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+/* -------------------------
+   4.2 Completion | XP
+------------------------- */
+.splitCardBottom {
+  padding: 20px 20px 18px;
+  border: 1.4px solid rgba(0, 0, 0, 0.14);
+  border-radius: 5px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr;
+  gap: 18px;
+  align-items: start;
+  box-sizing: border-box;
+}
+
+.completionPane,
+.splitLeft {
+  padding-right: 22px;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.xpPane,
+.splitRight {
+  padding-left: 22px;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.completionBody {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.donut {
+  width: 128px;
+  height: 128px;
+  border-radius: 999px;
+  background: conic-gradient(
+    rgba(120, 190, 140, 0.85) 0 55%,
+    rgba(240, 190, 90, 0.9) 55% 75%,
+    rgba(230, 90, 90, 0.9) 75% 100%
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.donutCenter {
+  width: 78px;
+  height: 78px;
+  border-radius: 999px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+}
+
+.legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.7);
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  display: inline-block;
+  margin-right: 8px;
+}
+
+.dotGreen {
+  background: rgba(120, 190, 140, 0.9);
+}
+
+.dotYellow {
+  background: rgba(240, 190, 90, 0.95);
+}
+
+.dotRed {
+  background: rgba(230, 90, 90, 0.95);
+}
+
+.periodToggle {
+  display: flex;
+  gap: 6px;
+}
+
+.pill {
+  border-radius: 5px;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  background: #fff;
+  padding: 6px 12px;
+  font-size: 11px;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
+}
+
+.pillOn {
+  background: rgba(255, 210, 120, 0.65);
+}
+
+.barChart {
+  height: 150px;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+  padding-bottom: 10px;
+  box-sizing: border-box;
+}
+
+.barCol {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.bar {
+  width: 18px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: rgba(130, 150, 210, 0.55);
+}
+
+.barLabel {
+  font-size: 10px;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+/* =========================================================
+   5) RIGHT COLUMN
+   - avatar card
+   - calendar card
+========================================================= */
+
+/* -------------------------
+   5.1 Avatar
+------------------------- */
+.avatarCard {
+  padding: 16px;
+  border: 1.4px solid rgba(0, 0, 0, 0.14);
+  border-radius: 5px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+}
+
+.avatarBig {
+  height: 240px;
+  border-radius: 5px;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  background: rgba(0, 0, 0, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatarStub {
+  width: 150px;
+  height: 190px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.02));
+}
+
+.avatarThumbRow {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+.avatarThumbCard {
+  width: 110px;
+  border-radius: 5px;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  background: #fff;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.06);
+  padding: 10px 10px 8px;
+  cursor: pointer;
+}
+
+.avatarThumbCardOn {
+  outline: 2px solid rgba(120, 140, 200, 0.65);
+}
+
+.avatarThumbImg {
+  height: 84px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.avatarCheck {
+  margin-top: 8px;
+  display: flex;
+  justify-content: center;
+}
+
+.checkBox {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  background: #fff;
+}
+
+.checkBoxOn {
+  background: rgba(120, 190, 140, 0.2);
+  border-color: rgba(120, 190, 140, 0.8);
+}
+
+/* -------------------------
+   5.2 Calendar
+------------------------- */
+.calendarCard {
+  position: relative;
+  width: 100%;
+  height: 440px;
+  padding: 0;
+  border: 1.5px solid #efefef;
+  border-radius: 2px;
+  background: #fefefe;
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.calendarPanel {
+  position: absolute;
+  top: 23px;
+  left: 12px;
+  right: 12px;
+  bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  background: #fefefe;
+}
+
+.calendarHeader {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 0 0 8px;
+}
+
+.calendarMonthChip {
+  height: 24px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.calendarTitle {
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1;
+  color: #000;
+  text-align: center;
+}
+
+.calendarGrid {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-family: Inter, Arial, sans-serif;
+  font-size: 11px;
+  color: #000;
+}
+
+.calendarRow {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  column-gap: 10px;
+}
+
+.calendarWeekDay {
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000;
+}
+
+.calendarCell {
+  min-height: 52px;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+.calendarCellInner {
+  width: 100%;
+  min-height: 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 2px;
+  box-sizing: border-box;
+}
+
+.calendarDay {
+  line-height: 1.1;
+}
+
+.calendarEvents {
+  margin-top: 4px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.calendarWeekEnd {
+  color: #17a1fa;
+}
+
+.calendarOtherMonth {
+  color: #616161;
+}
+
+.calendarMutedCell .calendarDay {
+  color: #b3b3b3;
+}
+
+.trackBar {
+  width: 26px;
+  height: 5px;
+  border-radius: 7px;
+  flex-shrink: 0;
+}
+
+.trackGreenWide {
+  width: 82px;
+  background: #84a59d;
+}
+
+.trackPink {
+  background: #d23f7e;
+}
+
+.trackYellow {
+  background: #f6bd60;
+}
+
+.trackGreen {
+  background: #84a59d;
+}
+
+.trackSoftPink {
+  background: #f5cac3;
+}
+
+.trackBlue {
+  background: #1270b0;
+}
+
+.trackOrange {
+  background: #e0a971;
+}
+
+.trackRose {
+  background: #ffa3b5;
+}
+
+/* =========================================================
+   6) MODAL
+   - popup แก้ข้อมูล
+   - ปรับให้เล็กลงและใช้งานง่าย
+========================================================= */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 20px;
+}
+
+.modalCard {
+  width: 620px;
+  max-width: calc(100vw - 40px);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  background: #fff;
+  border: 2px solid rgba(0, 0, 0, 0.18);
+  border-radius: 5px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+  padding: 22px 26px 18px;
+}
+
+.modalTitle {
+  font-size: 34px;
+  font-weight: 900;
+  letter-spacing: -0.3px;
+  margin-bottom: 14px;
+}
+
+.modalForm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.field {
+  display: block;
+}
+
+.modalLabel {
+  font-size: 13px;
+  font-weight: 800;
+  color: rgba(0, 0, 0, 0.65);
+  margin-bottom: 6px;
+}
+
+.modalInput {
+  width: 100%;
+  height: 42px;
+  border-radius: 4px;
+  border: 2px solid rgba(0, 0, 0, 0.35);
+  padding: 0 12px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.modalTextarea {
+  width: 100%;
+  min-height: 120px;
+  border-radius: 4px;
+  border: 2px solid rgba(0, 0, 0, 0.35);
+  padding: 10px 12px;
+  font-size: 14px;
+  resize: none;
+  box-sizing: border-box;
+}
+
+.modalGrid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.modalBtn {
+  width: 74px;
+  height: 54px;
+  border-radius: 6px;
+  border: 2px solid rgba(0, 0, 0, 0.55);
+  background: #fff;
+  font-size: 30px;
+  cursor: pointer;
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.12);
+}
+
+.modalOk {
+  background: rgba(120, 190, 140, 0.18);
+}
+
+.modalCancel {
+  background: rgba(230, 90, 90, 0.18);
+}
+
+/* =========================================================
+   7) RESPONSIVE
+   - หน้าจอกลาง
+   - มือถือ/แท็บเล็ต
+========================================================= */
+@media (max-width: 1100px) {
+  .dash {
+    grid-template-columns: 1fr;
+  }
+
+  .topGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .midGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .bioBox {
+    min-height: 220px;
+  }
+
+  .skillCard {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .splitCard {
+    grid-template-columns: 1fr;
+  }
+
+  .splitCardBottom {
+    grid-template-columns: 1fr;
+  }
+
+  .splitVR {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .modalCard {
+    width: 100%;
+    padding: 18px 16px 16px;
+  }
+
+  .modalTitle {
+    font-size: 28px;
+  }
+
+  .modalGrid2 {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .activityCards {
+    grid-template-columns: 1fr;
+  }
+
+  .tileRow {
+    grid-template-columns: 1fr;
+  }
+
+  .completionBody {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .avatarThumbRow {
+    flex-wrap: wrap;
+  }
+}
+
+/* =========================================================
+   8) CROP MODAL
+========================================================= */
+.cropOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 70;
+  padding: 20px;
+}
+
+.cropModal {
+  width: 460px;
+  max-width: calc(100vw - 40px);
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 10px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+  padding: 18px 18px 16px;
+  box-sizing: border-box;
+}
+
+.cropHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.cropTitle {
+  font-size: 18px;
+  font-weight: 800;
+  color: #000;
+}
+
+.cropClose {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.cropBox {
+  position: relative;
+  margin: 0 auto;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #f4f4f4;
+  border: 1px solid #e3e3e3;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.03);
+}
+
+.cropImg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform-origin: center center;
+  user-select: none;
+  -webkit-user-drag: none;
+  max-width: none;
+  max-height: none;
+}
+
+.cropDragLayer {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+}
+
+.cropDragLayer:active {
+  cursor: grabbing;
+}
+
+.cropControls {
+  margin-top: 16px;
+}
+
+.cropLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #000;
+}
+
+.cropLabel input[type="range"] {
+  width: 100%;
+}
+
+.cropActions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.cropBtn,
+.cropBtnPrimary {
+  min-width: 92px;
+  height: 40px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cropBtn {
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  background: #fff;
+}
+
+.cropBtnPrimary {
+  border: 1px solid #457b9d;
+  background: #457b9d;
+  color: #fff;
+}

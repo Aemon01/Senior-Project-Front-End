@@ -1,6 +1,6 @@
 "use client";
 
-import styles from "./page.module.css";
+import styles from "./ClientDashboard.module.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -39,10 +39,19 @@ const MOCK_ME: StudentMe = {
   xpMax: 1000,
 };
 
-const BADGE_TILES: Array<{ id: TileId; label: string }> = [
-  { id: "badges", label: "badges" },
-  { id: "certificate", label: "certificate" },
-  { id: "portfolio", label: "portfolio" },
+const LEVEL_BADGES = [
+  "/images/icons/badge01.png",
+  "/images/icons/badge02.png",
+  "/images/icons/badge03.png",
+  "/images/icons/badge04.png",
+  "/images/icons/badge05.png",
+];
+
+
+const BADGE_TILES: Array<{ id: TileId; label: string; image: string; alt: string }> = [
+  { id: "badges", label: "badges", image: "/images/icons/porttfolio-icon.png", alt: "Badges" },
+  { id: "certificate", label: "certificate", image: "/images/icons/porttfolio-icon.png", alt: "Certificate" },
+  { id: "portfolio", label: "portfolio", image: "/images/icons/porttfolio-icon.png", alt: "Portfolio" },
 ];
 
 const ACTIVITIES = [
@@ -95,6 +104,18 @@ export default function ClientDashboard() {
   // profile photo
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
+  const [cropUrl, setCropUrl] = useState<string | null>(null);
+  const [cropZoom, setCropZoom] = useState(1);
+  const [cropOffset, setCropOffset] = useState({ x: 0, y: 0 });
+  const [imgNat, setImgNat] = useState({ w: 0, h: 0 });
+
+  const cropBoxWidth = 280;
+  const cropBoxHeight = 190;
+  const baseScale =
+    imgNat.w && imgNat.h
+      ? Math.max(cropBoxWidth / imgNat.w, cropBoxHeight / imgNat.h)
+      : 1;
 
   // modal
   const [modal, setModal] = useState<ModalKind>(null);
@@ -109,6 +130,29 @@ export default function ClientDashboard() {
     address: "",
     about: "",
   });
+
+  const closeCropModal = () => {
+    if (cropUrl) URL.revokeObjectURL(cropUrl);
+    setCropUrl(null);
+    setCropOpen(false);
+  };
+
+  const startCropPhoto = (f: File | null) => {
+    if (!f) return;
+    const url = URL.createObjectURL(f);
+    setCropUrl(url);
+    setCropZoom(1);
+    setCropOffset({ x: 0, y: 0 });
+    setCropOpen(true);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (photoUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(photoUrl);
+      }
+    };
+  }, [photoUrl]);
 
   useEffect(() => {
     setMe(MOCK_ME);
@@ -140,8 +184,7 @@ export default function ClientDashboard() {
   const filledMedals = Math.min(5, Math.max(0, Math.floor(me.level / 2)));
 
   const onPickPhoto = (f: File | null) => {
-    if (!f) return;
-    setPhotoUrl(URL.createObjectURL(f));
+    startCropPhoto(f);
   };
 
   const openPhotoPicker = () => fileRef.current?.click();
@@ -158,13 +201,13 @@ export default function ClientDashboard() {
     setMe((prev) =>
       prev
         ? {
-            ...prev,
-            name: fullName,
-            phone: draft.phone,
-            email: draft.email,
-            address: draft.address,
-            bio: draft.about,
-          }
+          ...prev,
+          name: fullName,
+          phone: draft.phone,
+          email: draft.email,
+          address: draft.address,
+          bio: draft.about,
+        }
         : prev
     );
 
@@ -229,9 +272,148 @@ export default function ClientDashboard() {
               )}
             </ModalShell>
           )}
+          {cropOpen && cropUrl && (
+            <div className={styles.cropOverlay} role="dialog" aria-modal="true">
+              <div className={styles.cropModal}>
+                <div className={styles.cropHeader}>
+                  <div className={styles.cropTitle}>Crop Profile Photo</div>
+                  <button
+                    type="button"
+                    className={styles.cropClose}
+                    onClick={closeCropModal}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div
+                  className={styles.cropBox}
+                  style={{ width: cropBoxWidth, height: cropBoxHeight }}
+                >
+                  <img
+                    src={cropUrl}
+                    alt="Crop source"
+                    className={styles.cropImg}
+                    onLoad={(e) => {
+                      const img = e.currentTarget;
+                      setImgNat({ w: img.naturalWidth, h: img.naturalHeight });
+                    }}
+                    draggable={false}
+                    style={{
+                      transform: `translate(calc(-50% + ${cropOffset.x}px), calc(-50% + ${cropOffset.y}px)) scale(${baseScale * cropZoom})`,
+                    }}
+                  />
+
+                  <div
+                    className={styles.cropDragLayer}
+                    onMouseDown={(downEvt) => {
+                      downEvt.preventDefault();
+                      const start = { x: downEvt.clientX, y: downEvt.clientY };
+                      const startOff = { ...cropOffset };
+
+                      const onMove = (moveEvt: MouseEvent) => {
+                        const dx = moveEvt.clientX - start.x;
+                        const dy = moveEvt.clientY - start.y;
+                        setCropOffset({ x: startOff.x + dx, y: startOff.y + dy });
+                      };
+
+                      const onUp = () => {
+                        window.removeEventListener("mousemove", onMove);
+                        window.removeEventListener("mouseup", onUp);
+                      };
+
+                      window.addEventListener("mousemove", onMove);
+                      window.addEventListener("mouseup", onUp);
+                    }}
+                  />
+                </div>
+
+                <div className={styles.cropControls}>
+                  <label className={styles.cropLabel}>
+                    Zoom
+                    <input
+                      type="range"
+                      min={1}
+                      max={2.5}
+                      step={0.01}
+                      value={cropZoom}
+                      onChange={(e) => setCropZoom(parseFloat(e.target.value))}
+                    />
+                  </label>
+                </div>
+
+                <div className={styles.cropActions}>
+                  <button
+                    type="button"
+                    className={styles.cropBtn}
+                    onClick={closeCropModal}
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="button"
+                    className={styles.cropBtnPrimary}
+                    onClick={async () => {
+                      if (!cropUrl || !imgNat.w || !imgNat.h) return;
+
+                      const img = new Image();
+                      img.src = cropUrl;
+                      await new Promise<void>((res) => (img.onload = () => res()));
+
+                      const Cw = cropBoxWidth;
+                      const Ch = cropBoxHeight;
+
+                      const baseScale = Math.max(Cw / imgNat.w, Ch / imgNat.h);
+                      const s = baseScale * cropZoom;
+
+                      const rw = imgNat.w * s;
+                      const rh = imgNat.h * s;
+
+                      const left = (Cw - rw) / 2 + cropOffset.x;
+                      const top = (Ch - rh) / 2 + cropOffset.y;
+
+                      let sx = (0 - left) / s;
+                      let sy = (0 - top) / s;
+                      let sw = Cw / s;
+                      let sh = Ch / s;
+
+                      sx = Math.max(0, Math.min(imgNat.w - sw, sx));
+                      sy = Math.max(0, Math.min(imgNat.h - sh, sy));
+
+                      const outW = 840;
+                      const outH = 570;
+                      const canvas = document.createElement("canvas");
+                      canvas.width = outW;
+                      canvas.height = outH;
+
+                      const ctx = canvas.getContext("2d")!;
+                      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, outW, outH);
+
+                      const blob: Blob = await new Promise((resolve) =>
+                        canvas.toBlob((b) => resolve(b!), "image/png", 0.92)
+                      );
+
+                      const nextUrl = URL.createObjectURL(blob);
+
+                      setPhotoUrl((prev) => {
+                        if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+                        return nextUrl;
+                      });
+
+                      closeCropModal();
+                    }}
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
+
   );
 }
 
@@ -270,45 +452,56 @@ function TopProfileRow({
           onClick={openPhotoPicker}
           aria-label="Change profile photo"
         >
-          {photoUrl ? (
-            <img src={photoUrl} alt="Profile" className={styles.photoImg} />
-          ) : (
-            <div className={styles.photoPlaceholder} />
-          )}
+          <div className={styles.photoFrame}>
+            {photoUrl ? (
+              <img src={photoUrl} alt="Profile" className={styles.photoImg} />
+            ) : (
+              <div className={styles.photoPlaceholder} />
+            )}
+          </div>
         </button>
       </section>
 
-      <section className={cx(styles.card, styles.profileCard)}>
-        <div className={styles.profileHead}>
+      <section className={styles.bioBox}>
+        <div className={styles.bioBg} />
+
+        <button
+          className={styles.editButtonIcon}
+          type="button"
+          aria-label="Edit personal information"
+          onClick={onEdit}
+        >
+          ✎
+        </button>
+
+        <div className={styles.bioInformation}>
           <div className={styles.profileName}>{me.name}</div>
-          <button className={styles.editBtn} type="button" aria-label="Edit" onClick={onEdit}>
-            ✎
-          </button>
-        </div>
 
-        <div className={styles.profileBio}>{me.bio}</div>
-
-        <div className={styles.hr} />
-
-        <div className={styles.profileInfo2col}>
-          <div className={styles.infoCol}>
-            <div className={styles.infoRow}>
-              <span>Phone:</span> {me.phone}
-            </div>
-            <div className={styles.infoRow}>
-              <span>Address:</span> {me.address}
-            </div>
+          <div className={styles.profileBio}>
+            {me.bio}
           </div>
 
-          <div className={styles.vr} aria-hidden />
+          <div className={styles.linesWrap}>
+            <div className={styles.lineTop} />
+            <div className={styles.lineBottomLeft} />
+            <div className={styles.lineBottomRight} />
+            <div className={styles.lineVertical} />
+          </div>
 
-          <div className={styles.infoCol}>
-            <div className={styles.infoRow}>
-              <span>Email:</span> {me.email}
-            </div>
-            <div className={styles.infoRow}>
-              <span>Education:</span> {me.education}
-            </div>
+          <div className={styles.profilePhone}>
+            Phone: {me.phone}
+          </div>
+
+          <div className={styles.profileEmail}>
+            Email: {me.email}
+          </div>
+
+          <div className={styles.profileAddress}>
+            Address: {me.address}
+          </div>
+
+          <div className={styles.profileEducation}>
+            Education: {me.education}
           </div>
         </div>
       </section>
@@ -318,7 +511,6 @@ function TopProfileRow({
 
 function MidRow({
   me,
-  filledMedals,
   skills,
   onClickTile,
 }: {
@@ -327,55 +519,134 @@ function MidRow({
   skills: Skill[];
   onClickTile: (id: TileId) => void;
 }) {
+  const badgeThresholds = [5, 6, 10, 20, 35];
+  const filledMedals = badgeThresholds.filter((lv) => me.level >= lv).length;
+  const currentBadgeIndex =
+    filledMedals > 0 ? Math.min(filledMedals - 1, LEVEL_BADGES.length - 1) : -1;
+
   return (
     <div className={styles.midGrid}>
       <section className={cx(styles.card, styles.rankCard)}>
         <div className={styles.rankTop}>
-          <div className={styles.xpBox}>
-            <div className={styles.xpTop}>
-              {me.xp}/{me.xpMax}
-            </div>
-            <div className={styles.xpBottom}>XP</div>
-          </div>
+          <div className={styles.levelWrap}>
+            <div className={styles.levelXpBox} />
 
-          <div className={styles.levelBox}>
-            <div className={styles.levelNum}>{me.level}</div>
-            <div className={styles.levelMedal} aria-hidden />
+            <div className={styles.levelXpScore}>
+              <span>{me.xp}/{me.xpMax}</span>
+              <span>XP</span>
+            </div>
+
+            <div className={styles.levelBadgeBox}>
+              <div className={styles.levelBadgeBg} />
+              <div className={styles.levelValue}>{me.level}</div>
+            </div>
+
+            <img
+              src={
+                currentBadgeIndex >= 0
+                  ? LEVEL_BADGES[currentBadgeIndex]
+                  : "/images/icons/badge01-icon.png"
+              }
+              alt=""
+              aria-hidden="true"
+              className={styles.levelBadgeIcon}
+            />
+
           </div>
         </div>
 
         <div className={styles.medalRow}>
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className={cx(styles.medalSlot, i < filledMedals ? styles.medalOn : styles.medalOff)}>
-              🏅
-            </div>
-          ))}
+          {LEVEL_BADGES.map((src, i) => {
+            const unlocked = i < filledMedals;
+            const active = i === currentBadgeIndex;
+
+            return (
+              <div
+                key={src}
+                className={cx(
+                  styles.medalSlot,
+                  unlocked ? styles.medalOn : styles.medalOff,
+                  active && styles.medalActive
+                )}
+              >
+                <img
+                  src={src}
+                  alt={`Level badge ${i + 1}`}
+                  className={styles.medalImg}
+                  draggable={false}
+                />
+              </div>
+            );
+          })}
         </div>
 
         <div className={styles.tileRow}>
           {BADGE_TILES.map((t) => (
-            <button key={t.id} type="button" className={styles.tileBtn} onClick={() => onClickTile(t.id)}>
-              <div className={styles.tileThumb} aria-hidden />
+            <button
+              key={t.id}
+              type="button"
+              className={styles.tileBtn}
+              onClick={() => onClickTile(t.id)}
+              aria-label={t.label}
+            >
+              <div className={styles.tileOuter} />
+              <div className={styles.tileInner} />
+
+              <div className={styles.tileIconWrap}>
+                <img src={t.image} alt={t.alt} className={styles.tileIcon} />
+              </div>
+
               <div className={styles.tileLabel}>{t.label}</div>
             </button>
           ))}
         </div>
+
       </section>
 
       <section className={cx(styles.card, styles.skillCard)}>
-        <div className={styles.sectionTitle}>Skill Progress graph</div>
+        <div className={styles.skillHead}>
+          <div className={styles.skillTitle}>Skill Progress graph</div>
+        </div>
 
-        <div className={styles.skillScroll} role="region" aria-label="Skill progress list">
-          <div className={styles.skillRow}>
-            {skills.map((s) => (
-              <div key={s.id} className={styles.skillCol}>
-                <div className={styles.skillPct}>{s.percent}%</div>
-                <div className={styles.skillTube}>
-                  <div className={styles.skillFill} style={{ height: `${s.percent}%` }} />
+        <div className={styles.skillViewport}>
+          <div
+            className={styles.skillScroll}
+            role="region"
+            aria-label="Skill progress list"
+          >
+            <div className={styles.skillRow}>
+              {skills.map((s, i) => (
+                <div key={s.id} className={styles.skillCol}>
+                  <div className={styles.skillPct}>{s.percent}%</div>
+
+                  <div className={styles.skillTube}>
+                    <div
+                      className={cx(
+                        styles.skillFill,
+                        i === 0 && styles.trackGreenWide,
+                        i === 1 && styles.trackPink,
+                        i === 2 && styles.trackYellow,
+                        i === 3 && styles.trackGreen,
+                        i === 4 && styles.trackSoftPink,
+                        i === 5 && styles.trackBlue,
+                        i === 6 && styles.trackOrange,
+                        i === 7 && styles.trackRose,
+                        i === 8 && styles.trackSoftPink,
+                        i === 9 && styles.trackBlue,
+                        i === 10 && styles.trackOrange,
+                        i === 11 && styles.trackRose
+                      )}
+                      style={{ height: `${s.percent}%` }}
+                    />
+
+                  </div>
+
+                  <div className={styles.skillLabel} title={s.name}>
+                    {s.name}
+                  </div>
                 </div>
-                <div className={styles.skillLabel}>{s.name}</div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -439,7 +710,7 @@ function ActivityMissionSplit() {
 function BottomSplit() {
   return (
     <section className={cx(styles.card, styles.splitCardBottom)}>
-      <div className={styles.splitLeft}>
+      <div className={styles.completionPane}>
         <div className={styles.sectionTitle}>Activity Completion Status</div>
 
         <div className={styles.completionBody}>
@@ -463,7 +734,7 @@ function BottomSplit() {
 
       <div className={styles.splitVR} aria-hidden />
 
-      <div className={styles.splitRight}>
+      <div className={styles.xpPane}>
         <div className={styles.cardHead}>
           <div className={styles.sectionTitle}>สถิติ XP ล่าสุด</div>
           <div className={styles.periodToggle}>
@@ -525,23 +796,147 @@ function AvatarCard({
   );
 }
 
+type CalendarEvent =
+  | "pink"
+  | "yellow"
+  | "green"
+  | "softPink"
+  | "blue"
+  | "orange"
+  | "rose"
+  | "greenWide";
+
+type CalendarDayItem = {
+  day: string;
+  weekend?: boolean;
+  otherMonth?: boolean;
+  muted?: boolean;
+  events: CalendarEvent[];
+};
+
 function CalendarCard({ title }: { title: string }) {
+  const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  const weeks: CalendarDayItem[][] = [
+    [
+      { day: "28", otherMonth: true, events: [] },
+      { day: "29", otherMonth: true, events: [] },
+      { day: "30", otherMonth: true, events: [] },
+      { day: "1", events: ["green", "orange"] },
+      { day: "2", events: ["orange"] },
+      { day: "3", events: ["rose"] },
+      { day: "4", weekend: true, events: [] },
+    ],
+    [
+      { day: "5", weekend: true, events: ["pink", "yellow", "green"] },
+      { day: "6", events: ["softPink", "blue"] },
+      { day: "7", events: [] },
+      { day: "8", events: ["greenWide", "pink"] },
+      { day: "9", events: [] },
+      { day: "10", events: [] },
+      { day: "11", weekend: true, events: [] },
+    ],
+    [
+      { day: "12", weekend: true, muted: true, events: [] },
+      { day: "13", muted: true, events: [] },
+      { day: "14", muted: true, events: [] },
+      { day: "15", muted: true, events: [] },
+      { day: "16", muted: true, events: [] },
+      { day: "17", muted: true, events: [] },
+      { day: "18", weekend: true, muted: true, events: [] },
+    ],
+    [
+      { day: "19", weekend: true, muted: true, events: [] },
+      { day: "20", muted: true, events: [] },
+      { day: "21", muted: true, events: [] },
+      { day: "22", muted: true, events: [] },
+      { day: "23", muted: true, events: [] },
+      { day: "24", muted: true, events: [] },
+      { day: "25", weekend: true, muted: true, events: [] },
+    ],
+    [
+      { day: "26", weekend: true, muted: true, events: [] },
+      { day: "27", muted: true, events: [] },
+      { day: "28", muted: true, events: [] },
+      { day: "29", muted: true, events: [] },
+      { day: "30", muted: true, events: [] },
+      { day: "31", muted: true, events: [] },
+      { day: "1", otherMonth: true, muted: true, events: [] },
+    ],
+    [
+      { day: "2", otherMonth: true, events: [] },
+      { day: "3", otherMonth: true, events: [] },
+      { day: "4", otherMonth: true, events: [] },
+      { day: "5", otherMonth: true, events: [] },
+      { day: "6", otherMonth: true, events: [] },
+      { day: "7", otherMonth: true, events: [] },
+      { day: "8", otherMonth: true, events: [] },
+    ],
+  ];
+
   return (
     <section className={cx(styles.card, styles.calendarCard)}>
-      <div className={styles.calendarTitle}>{title}</div>
-
-      <div className={styles.calendarGrid}>
-        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-          <div key={d} className={styles.calDow}>
-            {d}
+      <div className={styles.calendarPanel}>
+        <div className={styles.calendarHeader}>
+          <div className={styles.calendarMonthChip}>
+            <div className={styles.calendarTitle}>{title}</div>
           </div>
-        ))}
+        </div>
 
-        {Array.from({ length: 35 }).map((_, i) => (
-          <div key={i} className={styles.calCell}>
-            {i < 2 ? "" : i - 1}
+        <div className={styles.calendarGrid}>
+          <div className={styles.calendarRow}>
+            {weekDays.map((d, idx) => (
+              <div
+                key={d}
+                className={cx(
+                  styles.calendarWeekDay,
+                  (idx === 0 || idx === 6) && styles.calendarWeekEnd
+                )}
+              >
+                {d}
+              </div>
+            ))}
           </div>
-        ))}
+
+          {weeks.map((week, rowIdx) => (
+            <div key={rowIdx} className={styles.calendarRow}>
+              {week.map((item, idx) => (
+                <div
+                  key={`${rowIdx}-${idx}-${item.day}`}
+                  className={cx(
+                    styles.calendarCell,
+                    item.weekend && styles.calendarWeekEnd,
+                    item.otherMonth && styles.calendarOtherMonth,
+                    item.muted && styles.calendarMutedCell
+                  )}
+                >
+                  <div className={styles.calendarCellInner}>
+                    <div className={styles.calendarDay}>{item.day}</div>
+
+                    <div className={styles.calendarEvents}>
+                      {item.events.map((event, i) => (
+                        <div
+                          key={i}
+                          className={cx(
+                            styles.trackBar,
+                            event === "pink" && styles.trackPink,
+                            event === "yellow" && styles.trackYellow,
+                            event === "green" && styles.trackGreen,
+                            event === "softPink" && styles.trackSoftPink,
+                            event === "blue" && styles.trackBlue,
+                            event === "orange" && styles.trackOrange,
+                            event === "rose" && styles.trackRose,
+                            event === "greenWide" && styles.trackGreenWide
+                          )}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );
