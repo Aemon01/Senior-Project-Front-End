@@ -1,0 +1,247 @@
+:root{
+  --bg: #f3eee8;
+  --nav-bg: #D5BDAF;
+  --nav-stroke: #9B897F;
+  --active: #F6BD60;
+  --stroke: #e0d6cd;
+  --shadow: 0 16px 26px rgba(0, 0, 0, 0.08);
+}
+
+.page{
+  height: 115dvh;
+  background: var(--bg);
+  padding: 28px;
+  box-sizing: border-box;
+}
+
+.topRow{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.logoWrap{
+  width: 64px;
+  height: 64px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo{
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}
+
+/* nav bar */
+.navBar{
+  display: flex;
+  gap: 18px;
+  padding: 12px 20px;
+  background: var(--nav-bg);
+  border-radius: 5px;
+  border: 2px solid rgba(0, 0, 0, 0.5);
+  box-shadow:
+    0 10px 20px rgba(0,0,0,0.18),      /* เงาด้านล่าง (ยกขึ้น) */
+    3px 5px 0 rgba(0,0,0,0.15),          /* เส้นเงาชิดขอบล่าง */
+    inset 0 2px 0 rgba(255,255,255,0.35); /* ไฮไลต์ด้านบน */
+}
+
+.navItem{
+  width: 110px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  text-decoration: none;
+  color: #111;
+  font-weight: 600;
+  font-size: 14px;
+
+  background: rgba(255,255,255,0.35);
+  border: 2px solid rgba(0,0,0,0.3);
+  border-radius: 4px;
+  box-shadow:
+    0 10px 20px rgba(0,0,0,0.18),      /* เงาด้านล่าง (ยกขึ้น) */
+    2px 4px 0 rgba(0,0,0,0.15),          /* เส้นเงาชิดขอบล่าง */
+    inset 0 2px 0 rgba(255, 255, 255, 0.653); /* ไฮไลต์ด้านบน */
+}
+
+.navItemActive{
+  background: var(--active);
+}
+.navItem:hover{
+  background: #F6BD60;
+  color: #f3f3f3;
+  border-color: #8c6861;
+}
+.navItem:active{
+  background: #F6BD60;
+  color: #504848;
+  border-color: #8c6861;
+}
+.navItemDisabled{
+  opacity: 0.55;
+  cursor: not-allowed;
+  pointer-events: none; /* ✅ กันคลิก */
+  filter: grayscale(0.2);
+}
+
+
+/* main */
+.main{
+  position: relative;
+  max-width: 1400px;
+  margin: 0 auto;
+  height: auto;
+  display: block;
+}
+
+/* city behind card */
+.left{
+  position: absolute;
+  left: 35px;
+  top: -60px;
+  width: 750px;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.city{
+  width: 100%;
+  filter: drop-shadow(0 14px 12px rgba(0,0,0,0.14));
+  transform: translateY(50px);
+}
+
+/* card */
+.card{
+  position: relative;
+  z-index: 2;
+  margin-left: 650px;
+  margin-top: 90px;
+
+  width: min(720px, calc(100% - 520px));
+  background: #fff;
+  border-radius: 6px;
+  border: 1px solid var(--stroke);
+  box-shadow: var(--shadow);
+
+  padding: 34px 34px 120px 34px;
+}
+
+.title{
+  margin: 0 0 20px;
+  font-size: 34px;
+  font-weight: 700;
+}
+
+/* ===== OTP UI ===== */
+.otpRow{
+  display: flex;
+  gap: 22px;
+  margin: 8px 0 14px;
+}
+
+.otpBox{
+  width: 72px;
+  height: 72px;
+  border-radius: 4px;
+  border: 2px solid rgba(0,0,0,0.28);
+  background: #fff;
+  font-size: 22px;
+  text-align: center;
+  outline: none;
+}
+
+.otpBox:focus{
+  border-color: #84A59D;
+  box-shadow: 0 0 0 3px rgba(132,165,157,0.25);
+}
+
+.otpBoxError{
+  border-color: #E63946 !important;
+  box-shadow: 0 0 0 3px rgba(230,57,70,0.22) !important;
+}
+
+.note{
+  margin: 0 0 22px;
+  font-size: 14px;
+  color: rgba(0,0,0,0.62);
+}
+
+.actions{
+  display: flex;
+  gap: 22px;
+}
+
+/* ปุ่มเหมือน register (confirm สีชมพู) */
+.btn{
+  width: 220px;
+  height: 46px;
+  border-radius: 4px;
+  border: 2px solid rgba(0,0,0,0.28);
+  background: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+
+.btn:hover{
+  background: #F5CAC3;
+  color: #504848;
+  border-color: #8c6861;
+}
+.btn:active{
+  background: #F5CAC3;
+  color: #504848;
+  border-color: #8c6861;
+}
+
+/* ปุ่ม send again ให้เป็นเขียวเหมือน toggle hover */
+.btnSecondary:hover,
+.btnSecondary:active{
+  background: #EFE69D;
+  color: #464444;
+  border-color: #EFE69D;
+}
+
+.btn:disabled{
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.countdown{
+  font-weight: 600;
+  margin-left: 6px;
+}
+
+.expired{
+  font-weight: 700;
+  color: crimson;
+  margin-left: 6px;
+} 
+
+/* responsive */
+@media (max-width: 1024px){
+  .left{
+    position: relative;
+    top: 0;
+    width: 100%;
+  }
+  .card{
+    margin-left: 0;
+    margin-top: 18px;
+    width: 100%;
+  }
+  .otpRow{
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+  .otpBox{
+    width: 56px;
+    height: 56px;
+  }
+}
