@@ -2,6 +2,7 @@ import type { NavItem } from "@/lib/config/student/routes";
 import { STUDENT_SIDEBAR_ITEMS } from "@/lib/config/student/routes";
 import StudentSidebar from "@/components/shared/student/StudentSidebar";
 import { Company } from "../types";
+import Avatar3D from "@/components/shared/Avatar3D";
 
 type ExploreHudProps = {
   selectedCompany: Company | null;
@@ -15,7 +16,7 @@ type ExploreHudProps = {
   level?: number;
   xpCurrent?: number;
   xpMax?: number;
-  avatarSrc?: string;
+  avatarModelUrl?: string;
 };
 
 export default function ExploreHud({
@@ -30,7 +31,7 @@ export default function ExploreHud({
   level = 10,
   xpCurrent = 580,
   xpMax = 1200,
-  avatarSrc = "/images/avatar picture/avatar3.png",
+  avatarModelUrl = "",
 }: ExploreHudProps) {
   const progressPct = Math.min((xpCurrent / xpMax) * 100, 100);
 
@@ -256,7 +257,15 @@ export default function ExploreHud({
           }}
           title="Avatar"
         >
-          <img src={avatarSrc} alt="Avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          <div style={{ width: "100%", height: "100%" }}>
+            <Avatar3D
+              modelUrl={avatarModelUrl || "/models/boy.glb"}
+              modelScale={1.80}
+              modelPosition={[-2.4, -0.3, 1]}
+              cameraPosition={[0, 0.95, 4.0]}
+              cameraFov={56}
+            />
+          </div>
         </div>
       </div>
 

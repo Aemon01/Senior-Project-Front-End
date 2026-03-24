@@ -3,74 +3,56 @@
 import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, useAnimations, useGLTF } from "@react-three/drei";
+import { SkeletonUtils } from "three-stdlib";
 import * as THREE from "three";
 
-function ErrorCatcher({
-  children,
-  onError,
-}: {
-  children: React.ReactNode;
-  onError: (err?: unknown) => void;
-}) {
-  try {
-    return <>{children}</>;
-  } catch (e) {
-    onError(e);
-    return null;
-  }
+function pickLoopClip(names: string[]) {
+  const lower = names.map((n) => n.toLowerCase());
+
+  const idleIdx = lower.findIndex((n) => n.includes("idle"));
+  if (idleIdx >= 0) return names[idleIdx];
+
+  const walkIdx = lower.findIndex((n) => n.includes("walk"));
+  if (walkIdx >= 0) return names[walkIdx];
+
+  const runIdx = lower.findIndex((n) => n.includes("run"));
+  if (runIdx >= 0) return names[runIdx];
+
+  return names[0] ?? null;
 }
 
-/** ตัวนี้จะถูก remount ทุกครั้งเมื่อ url เปลี่ยน เพราะเราใส่ key ตอนเรียก */
-function GLBAnimator({
-  url,
-  onClipCount,
-}: {
-  url: string;
-  onClipCount?: (n: number) => void;
-}) {
-  const group = useRef<THREE.Group>(null);
+function AnimatedAvatar({ url }: { url: string }) {
+  const rootRef = useRef<THREE.Group>(null);
   const gltf = useGLTF(url);
+  const clonedScene = useMemo(() => SkeletonUtils.clone(gltf.scene), [gltf.scene]);
+  const { actions, names, mixer } = useAnimations(gltf.animations, rootRef);
 
-  const clipCount = gltf.animations?.length ?? 0;
-  useEffect(() => {
-    onClipCount?.(clipCount);
-  }, [clipCount, onClipCount]);
-
-  const { actions, names, mixer } = useAnimations(gltf.animations, group);
-
-  // ✅ เล่น “ทุก clip” พร้อมกัน
   useEffect(() => {
     if (!names?.length) return;
 
-    // stop ก่อนกันค้าง
     names.forEach((n) => actions[n]?.stop());
 
-    names.forEach((n) => {
-      const a = actions[n];
-      a?.reset();
-      a?.fadeIn(0.15);
-      a?.play();
-    });
+    const clip = pickLoopClip(names);
+    if (!clip) return;
+
+    const action = actions[clip];
+    action?.reset();
+    action?.setLoop(THREE.LoopRepeat, Infinity);
+    action?.fadeIn(0.2);
+    action?.play();
 
     return () => {
       names.forEach((n) => actions[n]?.stop());
     };
   }, [actions, names, url]);
 
-  useFrame((state, dt) => {
+  useFrame((_, dt) => {
     mixer?.update(dt);
-
-    // idle bobbing เบา ๆ เพิ่ม (กันกรณีบาง clip เป็น pose/นิ่ง)
-    if (group.current) {
-      const t = state.clock.getElapsedTime();
-      group.current.position.y = Math.sin(t * 2.0) * 0.02;
-      group.current.rotation.y = 0;
-    }
   });
 
   return (
-    <group ref={group}>
-      <primitive object={gltf.scene} />
+    <group ref={rootRef}>
+      <primitive object={clonedScene} />
     </group>
   );
 }
@@ -78,10 +60,10 @@ function GLBAnimator({
 export default function Avatar3D({
   modelUrl,
   className,
-  modelScale = 1.8,
-  modelPosition = [0, -1.1, 0],
-  cameraPosition = [0, 1.2, 2.3],
-  cameraFov = 38,
+  modelScale = 2.0,
+  modelPosition = [0, -1.3, 0],
+  cameraPosition = [0, 1.25, 1.8],
+  cameraFov = 42,
 }: {
   modelUrl: string;
   className?: string;
@@ -91,54 +73,59 @@ export default function Avatar3D({
   cameraFov?: number;
 }) {
   const [failed, setFailed] = useState(false);
-  const [clipCount, setClipCount] = useState(0);
 
   useEffect(() => {
     setFailed(false);
-    setClipCount(0);
+    if (!modelUrl) return;
     try {
       useGLTF.preload(modelUrl);
-    } catch {}
+    } catch {
+      setFailed(true);
+    }
   }, [modelUrl]);
 
-  if (failed) {
+  if (!modelUrl || failed) {
     return (
       <div
         className={className}
-        style={{ display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.7 }}
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "grid",
+          placeItems: "center",
+          fontSize: 10,
+          opacity: 0.7,
+        }}
       >
-        Model failed to load
+        Avatar unavailable
       </div>
     );
   }
 
   return (
-    <div className={className} aria-label="Avatar 3D frame">
-      <Canvas camera={{ position: cameraPosition as any, fov: cameraFov }}>
+    <div
+      className={className}
+      style={{ width: "100%", height: "100%", display: "block" }}
+      aria-label="Avatar 3D frame"
+    >
+      <Canvas
+        camera={{ position: cameraPosition as any, fov: cameraFov }}
+        gl={{ alpha: true, antialias: true }}
+        onCreated={({ gl }) => {
+          gl.setClearColor(0x000000, 0);
+        }}
+      >
         <ambientLight intensity={0.9} />
         <directionalLight position={[3, 5, 3]} intensity={1.1} />
 
         <Suspense fallback={null}>
-          <group position={modelPosition as any} scale={modelScale}>
-            <ErrorCatcher
-              onError={(e) => {
-                console.error("Avatar3D error:", modelUrl, e);
-                setFailed(true);
-              }}
-            >
-              {/* สำคัญที่สุด: key บังคับ remount */}
-              <GLBAnimator key={modelUrl} url={modelUrl} onClipCount={setClipCount} />
-            </ErrorCatcher>
+          <group position={modelPosition as any} scale={modelScale} rotation={[-0.1, 0.3, 0]}>
+            <AnimatedAvatar key={modelUrl} url={modelUrl} />
           </group>
         </Suspense>
 
-        {/* ล็อกไม่ให้หมุน/ซูม/เลื่อน */}
         <OrbitControls enableZoom={false} enablePan={false} enableRotate={false} />
       </Canvas>
-
-      <div style={{ textAlign: "center", marginTop: 6, fontSize: 12, opacity: 0.6 }}>
-        clips: {clipCount}
-      </div>
     </div>
   );
 }

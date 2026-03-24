@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback, type ChangeEvent } from "react";
 import styles from "./PortfolioPage.module.css";
 
 type ItemSource = "upload" | "platform";
@@ -8,6 +8,17 @@ type ItemSource = "upload" | "platform";
 type UploadFileItem = {
     id: string;
     name: string;
+};
+
+type EducationItem = {
+    id: string;
+    school: string;
+    degree: string;
+    faculty: string;
+    fieldOfStudy: string;
+    startYear: string;
+    endYear: string;
+    gpa: string;
 };
 
 type CertificateItem = {
@@ -80,14 +91,13 @@ type SkillFormState = {
 };
 
 const initialPersonalForm = {
-    firstName: "Carolyn",
-    lastName: "Stewart",
+    firstName: "",
+    lastName: "",
     birthDate: "",
-    phone: "123-745-9803",
-    email: "carolyn.stewart@example.com",
-    address: "1754 Maple Drive Houston, PA 71107",
-    aboutMe:
-        "Experienced professional in design bringing fresh perspectives. Committed to creating impactful solutions and driving positive change.",
+    phone: "",
+    email: "",
+    address: "",
+    aboutMe: "",
 };
 
 const emptyEducationForm: EducationFormState = {
@@ -190,7 +200,117 @@ function filesToUploadItems(fileList: FileList | null) {
     }));
 }
 
+function normalizeSource(value: unknown): ItemSource {
+    return String(value ?? "").trim().toLowerCase() === "upload"
+        ? "upload"
+        : "platform";
+}
+
+function normalizeSkillKind(value: unknown): SkillKind {
+    const s = String(value ?? "").trim().toLowerCase();
+    return s.includes("soft") ? "soft" : "technical";
+}
+
+function normalizeDate(value: unknown) {
+    const s = String(value ?? "").trim();
+    if (!s) return "";
+    if (s.includes("T")) return s.slice(0, 10);
+    return s;
+}
+
+function buildEducationLabel(item: any) {
+    const school = String(
+        item?.school ??
+        item?.facultyschool ??
+        item?.educational_institution ??
+        item?.institution ??
+        ""
+    ).trim();
+
+    const start = String(item?.startYear ?? item?.start_year ?? "").trim();
+    const end = String(item?.endYear ?? item?.end_year ?? "").trim();
+    const gpa = String(item?.gpa ?? "").trim();
+
+    const yearText = start || end ? ` (${start || "-"} - ${end || "Present"})` : "";
+    const gpaText = gpa ? ` (GPA: ${gpa})` : "";
+
+    return `${school || "Education"}${yearText}${gpaText}`;
+}
+
+function toEducationItem(item: any, index: number): EducationItem {
+    return {
+        id: item?.id || item?.education_id || makeId(`education-${index}`),
+        school: String(
+            item?.school ??
+            item?.facultyschool ??
+            item?.educational_institution ??
+            item?.institution ??
+            item?.university ??
+            ""
+        ).trim(),
+        degree: String(item?.degree ?? item?.degree_level ?? "").trim(),
+        faculty: String(item?.faculty ?? "").trim(),
+        fieldOfStudy: String(item?.fieldOfStudy ?? item?.field_of_study ?? item?.major ?? "").trim(),
+        startYear: String(item?.startYear ?? item?.start_year ?? item?.start_date ?? "").trim(),
+        endYear: String(item?.endYear ?? item?.end_year ?? item?.end_date ?? "").trim(),
+        gpa: String(item?.gpa ?? "").trim(),
+    };
+}
+
+function toEducationPayload(items: EducationItem[]) {
+    return {
+        education: items.map((item) => ({
+            id: item.id,
+            school: item.school.trim(),
+            degree: item.degree.trim(),
+            faculty: item.faculty.trim(),
+            field_of_study: item.fieldOfStudy.trim(),
+            start_year: item.startYear.trim(),
+            end_year: item.endYear.trim(),
+            gpa: item.gpa.trim(),
+        })),
+    };
+}
+
+function toSkillsPayload(items: SkillItem[]) {
+    return {
+        skills: items.map((item) => ({
+            id: item.id,
+            name: item.name.trim(),
+            kind: item.kind,
+            source: item.source,
+            isSelected: item.isSelected,
+        })),
+    };
+}
+
+function toCertificatesPayload(items: CertificateItem[]) {
+    return {
+        certificates: items.map((item) => ({
+            id: item.id,
+            title: item.title.trim(),
+            date: item.date.trim(),
+            source: item.source,
+            files: item.files,
+        })),
+    };
+}
+
+function toExperiencesPayload(items: ExperienceItem[]) {
+    return {
+        experiences: items.map((item) => ({
+            id: item.id,
+            period: item.period.trim(),
+            title: item.title.trim(),
+            description: item.description.trim(),
+            source: item.source,
+            files: item.files,
+        })),
+    };
+}
+
 export default function PortfolioPage() {
+    const [isLoading, setIsLoading] = useState(true);
     const birthInputRef = useRef<HTMLInputElement | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const certificateUploadRef = useRef<HTMLInputElement | null>(null);
@@ -206,79 +326,87 @@ export default function PortfolioPage() {
 
     const [form, setForm] = useState(initialPersonalForm);
 
-    const [educationList, setEducationList] = useState([
-        "Suankularb Wittayalai (2015 - 2021) (GPA: 3.99)",
-        "Mahidol University (2022 - 2025) (GPA: 3.94)",
-    ]);
+    const [loadedForm, setLoadedForm] = useState(initialPersonalForm);
+
+    const [educationList, setEducationList] = useState<EducationItem[]>([]);
+    const [isSaving, setIsSaving] = useState(false);
+    const [skills, setSkills] = useState<SkillItem[]>([]);
+    const [certificates, setCertificates] = useState<CertificateItem[]>([]);
+    const [experiences, setExperiences] = useState<ExperienceItem[]>([]);
+
+    // const [educationList, setEducationList] = useState([
+    //     "Suankularb Wittayalai (2015 - 2021) (GPA: 3.99)",
+    //     "Mahidol University (2022 - 2025) (GPA: 3.94)",
+    // ]);
     const [educationForm, setEducationForm] = useState<EducationFormState>(emptyEducationForm);
     const [editingEducationIndex, setEditingEducationIndex] = useState<number | null>(null);
 
-    const [skills, setSkills] = useState<SkillItem[]>([
-        { id: "s1", name: "Python", kind: "technical", source: "upload", isSelected: true },
-        { id: "s2", name: "C++", kind: "technical", source: "upload", isSelected: true },
-        { id: "s3", name: "Cloud Computing", kind: "technical", source: "upload", isSelected: false },
-        { id: "s4", name: "Presentation", kind: "soft", source: "platform", isSelected: true },
-    ]);
+    // const [skills, setSkills] = useState<SkillItem[]>([
+    //     { id: "s1", name: "Python", kind: "technical", source: "upload", isSelected: true },
+    //     { id: "s2", name: "C++", kind: "technical", source: "upload", isSelected: true },
+    //     { id: "s3", name: "Cloud Computing", kind: "technical", source: "upload", isSelected: false },
+    //     { id: "s4", name: "Presentation", kind: "soft", source: "platform", isSelected: true },
+    // ]);
     const [skillForm, setSkillForm] = useState<SkillFormState>(emptySkillForm);
     const [editingSkillIndex, setEditingSkillIndex] = useState<number | null>(null);
 
-    const [certificates, setCertificates] = useState<CertificateItem[]>([
-        { id: "c1", title: "AWS Cloud Computing for Development", date: "01/07/2025", source: "upload", files: [{ id: "cf1", name: "aws-cloud-computing.pdf" }] },
-        { id: "c2", title: "AWS Basic Cloud Computing", date: "01/07/2025", source: "platform", files: [] },
-        { id: "c3", title: "VCEP Python Basic", date: "01/07/2025", source: "platform", files: [] },
-        { id: "c4", title: "Frontend Foundations", date: "15/08/2025", source: "upload", files: [{ id: "cf2", name: "frontend-foundations.png" }] },
-        { id: "c5", title: "UI Design Principles", date: "01/09/2025", source: "platform", files: [] },
-    ]);
+    // const [certificates, setCertificates] = useState<CertificateItem[]>([
+    //     { id: "c1", title: "AWS Cloud Computing for Development", date: "01/07/2025", source: "upload", files: [{ id: "cf1", name: "aws-cloud-computing.pdf" }] },
+    //     { id: "c2", title: "AWS Basic Cloud Computing", date: "01/07/2025", source: "platform", files: [] },
+    //     { id: "c3", title: "VCEP Python Basic", date: "01/07/2025", source: "platform", files: [] },
+    //     { id: "c4", title: "Frontend Foundations", date: "15/08/2025", source: "upload", files: [{ id: "cf2", name: "frontend-foundations.png" }] },
+    //     { id: "c5", title: "UI Design Principles", date: "01/09/2025", source: "platform", files: [] },
+    // ]);
     const [certificateForm, setCertificateForm] = useState<CertificateFormState>(emptyCertificateForm);
     const [editingCertificateIndex, setEditingCertificateIndex] = useState<number | null>(null);
 
-    const [experiences, setExperiences] = useState<ExperienceItem[]>([
-        {
-            id: "e1",
-            period: "2024 - 2025",
-            title: "Python Basic",
-            description:
-                "Accessed basic Python classes in the VCEP platform and learned programming fundamentals, syntax, and problem-solving practice.",
-            source: "platform",
-            files: [],
-        },
-        {
-            id: "e2",
-            period: "2025",
-            title: "UI Layout Explanation Task",
-            description:
-                "Designed and explained interface layouts with attention to readability, hierarchy, and responsive structure.",
-            source: "upload",
-            files: [{ id: "ef-upload-1", name: "activity-evidence.pdf" }],
-        },
-        {
-            id: "e3",
-            period: "2025",
-            title: "Responsive Web Page Workshop",
-            description:
-                "Built responsive page sections and improved alignment, spacing, and component scaling for multiple screen sizes.",
-            source: "platform",
-            files: [],
-        },
-        {
-            id: "e4",
-            period: "2023 - 2024",
-            title: "Frontend Basics",
-            description:
-                "Learned component-based UI development, page composition, styling systems, and reusable interface blocks.",
-            source: "platform",
-            files: [],
-        },
-        {
-            id: "e5",
-            period: "2023 - 2024",
-            title: "Portfolio Preparation",
-            description:
-                "Collected achievements, summarized skills, and arranged sections into a clean, structured portfolio format.",
-            source: "upload",
-            files: [{ id: "ef-upload-2", name: "portfolio-summary.docx" }],
-        },
-    ]);
+    // const [experiences, setExperiences] = useState<ExperienceItem[]>([
+    //     {
+    //         id: "e1",
+    //         period: "2024 - 2025",
+    //         title: "Python Basic",
+    //         description:
+    //             "Accessed basic Python classes in the VCEP platform and learned programming fundamentals, syntax, and problem-solving practice.",
+    //         source: "platform",
+    //         files: [],
+    //     },
+    //     {
+    //         id: "e2",
+    //         period: "2025",
+    //         title: "UI Layout Explanation Task",
+    //         description:
+    //             "Designed and explained interface layouts with attention to readability, hierarchy, and responsive structure.",
+    //         source: "upload",
+    //         files: [{ id: "ef-upload-1", name: "activity-evidence.pdf" }],
+    //     },
+    //     {
+    //         id: "e3",
+    //         period: "2025",
+    //         title: "Responsive Web Page Workshop",
+    //         description:
+    //             "Built responsive page sections and improved alignment, spacing, and component scaling for multiple screen sizes.",
+    //         source: "platform",
+    //         files: [],
+    //     },
+    //     {
+    //         id: "e4",
+    //         period: "2023 - 2024",
+    //         title: "Frontend Basics",
+    //         description:
+    //             "Learned component-based UI development, page composition, styling systems, and reusable interface blocks.",
+    //         source: "platform",
+    //         files: [],
+    //     },
+    //     {
+    //         id: "e5",
+    //         period: "2023 - 2024",
+    //         title: "Portfolio Preparation",
+    //         description:
+    //             "Collected achievements, summarized skills, and arranged sections into a clean, structured portfolio format.",
+    //         source: "upload",
+    //         files: [{ id: "ef-upload-2", name: "portfolio-summary.docx" }],
+    //     },
+    // ]);
     const [experienceForm, setExperienceForm] = useState<ExperienceFormState>(emptyExperienceForm);
     const [editingExperienceIndex, setEditingExperienceIndex] = useState<number | null>(null);
 
@@ -323,7 +451,7 @@ export default function PortfolioPage() {
         birthInputRef.current?.focus();
     }
 
-    function onPhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    function onPhotoChange(e: ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0];
         if (!file) return;
 
@@ -354,12 +482,30 @@ export default function PortfolioPage() {
         setEditorMode("experience");
     }
 
-    function onCancelPersonal() {
-        setForm(initialPersonalForm);
+    async function savePortfolioSection(type: "info" | "education" | "skills" | "certificate" | "experience", payload: unknown) {
+        setIsSaving(true);
+
+        try {
+            const res = await fetch(`/api/student/portfolio?type=${type}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+
+            const result = await res.json().catch(() => null);
+            if (!res.ok || !result?.ok) {
+                throw new Error(result?.message || `Failed to save ${type}`);
+            }
+
+            setShowSave(true);
+            return result;
+        } finally {
+            setIsSaving(false);
+        }
     }
 
-    function onSavePersonal() {
-        setShowSave(true);
+    function onCancelPersonal() {
+        setForm(loadedForm);
     }
 
     function onAddEducation() {
@@ -369,42 +515,48 @@ export default function PortfolioPage() {
     }
 
     function onEditEducation(index: number) {
-        const item = educationList[index] ?? "";
-        const schoolMatch = item.match(/^(.*?)(?:\s*\()/);
-        const yearMatch = item.match(/\((\d{4})\s*-\s*(\d{4}|Currently)\)/);
-        const gpaMatch = item.match(/GPA:\s*([0-9.]+)/i);
+        const item = educationList[index];
+        if (!item) return;
 
         setEditingEducationIndex(index);
         setEducationForm({
-            school: schoolMatch?.[1]?.trim() || item,
-            degree: "",
-            faculty: "",
-            fieldOfStudy: "",
-            startYear: yearMatch?.[1] || "",
-            endYear: yearMatch?.[2] || "",
-            gpa: gpaMatch?.[1] || "",
+            school: item.school,
+            degree: item.degree,
+            faculty: item.faculty,
+            fieldOfStudy: item.fieldOfStudy,
+            startYear: item.startYear,
+            endYear: item.endYear,
+            gpa: item.gpa,
         });
         setEditorMode("educationForm");
     }
 
-    function onSaveEducationForm() {
-        const school = educationForm.school.trim() || "New School";
-        const start = educationForm.startYear.trim() || "YYYY";
-        const end = educationForm.endYear.trim() || "YYYY";
-        const gpa = educationForm.gpa.trim();
+    async function onSaveEducationForm() {
+        try {
+            const nextItem: EducationItem = {
+                id: editingEducationIndex === null ? makeId("education") : educationList[editingEducationIndex]?.id ?? makeId("education"),
+                school: educationForm.school.trim() || "New School",
+                degree: educationForm.degree.trim(),
+                faculty: educationForm.faculty.trim(),
+                fieldOfStudy: educationForm.fieldOfStudy.trim(),
+                startYear: educationForm.startYear.trim(),
+                endYear: educationForm.endYear.trim(),
+                gpa: educationForm.gpa.trim(),
+            };
 
-        const label = gpa ? `${school} (${start} - ${end}) (GPA: ${gpa})` : `${school} (${start} - ${end})`;
+            const nextList = editingEducationIndex === null
+                ? [...educationList, nextItem]
+                : educationList.map((item, index) => (index === editingEducationIndex ? nextItem : item));
 
-        if (editingEducationIndex === null) {
-            setEducationList((prev) => [...prev, label]);
-        } else {
-            setEducationList((prev) => prev.map((item, index) => (index === editingEducationIndex ? label : item)));
+            await savePortfolioSection("education", toEducationPayload(nextList));
+            setEducationList(nextList);
+            setEducationForm(emptyEducationForm);
+            setEditingEducationIndex(null);
+            setEditorMode("education");
+        } catch (error: any) {
+            console.error("Failed to save education:", error);
+            alert(error?.message || "Failed to save education");
         }
-
-        setEducationForm(emptyEducationForm);
-        setEditingEducationIndex(null);
-        setEditorMode("education");
-        setShowSave(true);
     }
 
     function onCancelEducationForm() {
@@ -432,25 +584,29 @@ export default function PortfolioPage() {
         setEditorMode("skillsForm");
     }
 
-    function onSaveSkillForm() {
-        const nextItem: SkillItem = {
-            id: editingSkillIndex === null ? makeId("skill") : skills[editingSkillIndex]?.id ?? makeId("skill"),
-            name: skillForm.name.trim() || "New Skill",
-            kind: skillForm.kind,
-            source: editingSkillIndex === null ? "upload" : (skills[editingSkillIndex]?.source ?? "upload"),
-            isSelected: editingSkillIndex === null ? true : (skills[editingSkillIndex]?.isSelected ?? true),
-        };
+    async function onSaveSkillForm() {
+        try {
+            const nextItem: SkillItem = {
+                id: editingSkillIndex === null ? makeId("skill") : skills[editingSkillIndex]?.id ?? makeId("skill"),
+                name: skillForm.name.trim() || "New Skill",
+                kind: skillForm.kind,
+                source: editingSkillIndex === null ? "upload" : skills[editingSkillIndex]?.source ?? "upload",
+                isSelected: editingSkillIndex === null ? true : skills[editingSkillIndex]?.isSelected ?? true,
+            };
 
-        if (editingSkillIndex === null) {
-            setSkills((prev) => [...prev, nextItem]);
-        } else {
-            setSkills((prev) => prev.map((item, index) => (index === editingSkillIndex ? nextItem : item)));
+            const nextList = editingSkillIndex === null
+                ? [...skills, nextItem]
+                : skills.map((item, index) => (index === editingSkillIndex ? nextItem : item));
+
+            await savePortfolioSection("skills", toSkillsPayload(nextList));
+            setSkills(nextList);
+            setSkillForm(emptySkillForm);
+            setEditingSkillIndex(null);
+            setEditorMode("skills");
+        } catch (error: any) {
+            console.error("Failed to save skills:", error);
+            alert(error?.message || "Failed to save skills");
         }
-
-        setSkillForm(emptySkillForm);
-        setEditingSkillIndex(null);
-        setEditorMode("skills");
-        setShowSave(true);
     }
 
     function onCancelSkillForm() {
@@ -459,15 +615,21 @@ export default function PortfolioPage() {
         setEditorMode("skills");
     }
 
-    function onToggleSkillSelected(index: number) {
-        setSkills((prev) =>
-            prev.map((item, i) =>
-                i === index ? { ...item, isSelected: !item.isSelected } : item
-            )
+    async function onToggleSkillSelected(index: number) {
+        const nextList = skills.map((item, i) =>
+            i === index ? { ...item, isSelected: !item.isSelected } : item
         );
+
+        try {
+            await savePortfolioSection("skills", toSkillsPayload(nextList));
+            setSkills(nextList);
+        } catch (error: any) {
+            console.error("Failed to update skills:", error);
+            alert(error?.message || "Failed to update skills");
+        }
     }
 
-    function onSelectPlatformSkill(option: SkillItem) {
+    async function onSelectPlatformSkill(option: SkillItem) {
         const exists = skills.some(
             (item) =>
                 item.name.trim().toLowerCase() === option.name.trim().toLowerCase() &&
@@ -476,11 +638,15 @@ export default function PortfolioPage() {
         );
         if (exists) return;
 
-        setSkills((prev) => [
-            ...prev,
-            { ...option, id: makeId("skill"), isSelected: true },
-        ]);
-        setShowSave(true);
+        const nextList = [...skills, { ...option, id: makeId("skill"), isSelected: true }];
+
+        try {
+            await savePortfolioSection("skills", toSkillsPayload(nextList));
+            setSkills(nextList);
+        } catch (error: any) {
+            console.error("Failed to add platform skill:", error);
+            alert(error?.message || "Failed to add skill");
+        }
     }
 
     function onAddCertificate() {
@@ -497,25 +663,29 @@ export default function PortfolioPage() {
         setEditorMode("certificateForm");
     }
 
-    function onSaveCertificateForm() {
-        const nextItem: CertificateItem = {
-            id: editingCertificateIndex === null ? makeId("certificate") : certificates[editingCertificateIndex]?.id ?? makeId("certificate"),
-            title: certificateForm.title.trim() || "New Certificate",
-            date: certificateForm.date.trim() || "DD/MM/YYYY",
-            source: certificateForm.source,
-            files: certificateForm.source === "upload" ? certificateForm.files : [],
-        };
+    async function onSaveCertificateForm() {
+        try {
+            const nextItem: CertificateItem = {
+                id: editingCertificateIndex === null ? makeId("certificate") : certificates[editingCertificateIndex]?.id ?? makeId("certificate"),
+                title: certificateForm.title.trim() || "New Certificate",
+                date: certificateForm.date.trim() || "DD/MM/YYYY",
+                source: certificateForm.source,
+                files: certificateForm.source === "upload" ? certificateForm.files : [],
+            };
 
-        if (editingCertificateIndex === null) {
-            setCertificates((prev) => [...prev, nextItem]);
-        } else {
-            setCertificates((prev) => prev.map((item, index) => (index === editingCertificateIndex ? nextItem : item)));
+            const nextList = editingCertificateIndex === null
+                ? [...certificates, nextItem]
+                : certificates.map((item, index) => (index === editingCertificateIndex ? nextItem : item));
+
+            await savePortfolioSection("certificate", toCertificatesPayload(nextList));
+            setCertificates(nextList);
+            setCertificateForm(emptyCertificateForm);
+            setEditingCertificateIndex(null);
+            setEditorMode("certificate");
+        } catch (error: any) {
+            console.error("Failed to save certificate:", error);
+            alert(error?.message || "Failed to save certificate");
         }
-
-        setCertificateForm(emptyCertificateForm);
-        setEditingCertificateIndex(null);
-        setEditorMode("certificate");
-        setShowSave(true);
     }
 
     function onCancelCertificateForm() {
@@ -524,7 +694,7 @@ export default function PortfolioPage() {
         setEditorMode("certificate");
     }
 
-    function onSelectPlatformCertificate(option: CertificateItem) {
+    async function onSelectPlatformCertificate(option: CertificateItem) {
         const exists = certificates.some(
             (item) =>
                 item.title.trim().toLowerCase() === option.title.trim().toLowerCase() &&
@@ -533,8 +703,15 @@ export default function PortfolioPage() {
         );
         if (exists) return;
 
-        setCertificates((prev) => [...prev, { ...option, id: makeId("certificate"), files: [] }]);
-        setShowSave(true);
+        const nextList = [...certificates, { ...option, id: makeId("certificate"), files: [] }];
+
+        try {
+            await savePortfolioSection("certificate", toCertificatesPayload(nextList));
+            setCertificates(nextList);
+        } catch (error: any) {
+            console.error("Failed to add platform certificate:", error);
+            alert(error?.message || "Failed to add certificate");
+        }
     }
 
     function onAddExperience() {
@@ -557,26 +734,30 @@ export default function PortfolioPage() {
         setEditorMode("experienceForm");
     }
 
-    function onSaveExperienceForm() {
-        const nextItem: ExperienceItem = {
-            id: editingExperienceIndex === null ? makeId("experience") : experiences[editingExperienceIndex]?.id ?? makeId("experience"),
-            period: experienceForm.period.trim() || "YYYY",
-            title: experienceForm.title.trim() || "New Activity",
-            description: experienceForm.description.trim() || "Add activity description.",
-            source: experienceForm.source,
-            files: experienceForm.source === "upload" ? experienceForm.files : [],
-        };
+    async function onSaveExperienceForm() {
+        try {
+            const nextItem: ExperienceItem = {
+                id: editingExperienceIndex === null ? makeId("experience") : experiences[editingExperienceIndex]?.id ?? makeId("experience"),
+                period: experienceForm.period.trim() || "YYYY",
+                title: experienceForm.title.trim() || "New Activity",
+                description: experienceForm.description.trim() || "Add activity description.",
+                source: experienceForm.source,
+                files: experienceForm.source === "upload" ? experienceForm.files : [],
+            };
 
-        if (editingExperienceIndex === null) {
-            setExperiences((prev) => [...prev, nextItem]);
-        } else {
-            setExperiences((prev) => prev.map((item, index) => (index === editingExperienceIndex ? nextItem : item)));
+            const nextList = editingExperienceIndex === null
+                ? [...experiences, nextItem]
+                : experiences.map((item, index) => (index === editingExperienceIndex ? nextItem : item));
+
+            await savePortfolioSection("experience", toExperiencesPayload(nextList));
+            setExperiences(nextList);
+            setExperienceForm(emptyExperienceForm);
+            setEditingExperienceIndex(null);
+            setEditorMode("experience");
+        } catch (error: any) {
+            console.error("Failed to save experience:", error);
+            alert(error?.message || "Failed to save experience");
         }
-
-        setExperienceForm(emptyExperienceForm);
-        setEditingExperienceIndex(null);
-        setEditorMode("experience");
-        setShowSave(true);
     }
 
     function onCancelExperienceForm() {
@@ -585,7 +766,7 @@ export default function PortfolioPage() {
         setEditorMode("experience");
     }
 
-    function onSelectPlatformExperience(option: ExperienceItem) {
+    async function onSelectPlatformExperience(option: ExperienceItem) {
         const exists = experiences.some(
             (item) =>
                 item.title.trim().toLowerCase() === option.title.trim().toLowerCase() &&
@@ -594,11 +775,18 @@ export default function PortfolioPage() {
         );
         if (exists) return;
 
-        setExperiences((prev) => [...prev, { ...option, id: makeId("experience"), files: [] }]);
-        setShowSave(true);
+        const nextList = [...experiences, { ...option, id: makeId("experience"), files: [] }];
+
+        try {
+            await savePortfolioSection("experience", toExperiencesPayload(nextList));
+            setExperiences(nextList);
+        } catch (error: any) {
+            console.error("Failed to add platform experience:", error);
+            alert(error?.message || "Failed to add experience");
+        }
     }
 
-    function onCertificateFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
+    function onCertificateFilesChange(e: ChangeEvent<HTMLInputElement>) {
         const nextFiles = filesToUploadItems(e.target.files);
         if (nextFiles.length === 0) return;
         setCertificateForm((prev) => ({
@@ -616,7 +804,7 @@ export default function PortfolioPage() {
         }));
     }
 
-    function onExperienceFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
+    function onExperienceFilesChange(e: ChangeEvent<HTMLInputElement>) {
         const nextFiles = filesToUploadItems(e.target.files);
         if (nextFiles.length === 0) return;
         setExperienceForm((prev) => ({
@@ -640,26 +828,41 @@ export default function PortfolioPage() {
         setShowDelete(true);
     }
 
-    function onConfirmDelete() {
+    async function onConfirmDelete() {
         if (deleteIndex === null || !deleteTarget) return;
 
-        if (deleteTarget === "education") {
-            setEducationList((prev) => prev.filter((_, i) => i !== deleteIndex));
-        }
-        if (deleteTarget === "skills") {
-            setSkills((prev) => prev.filter((_, i) => i !== deleteIndex));
-        }
-        if (deleteTarget === "certificate") {
-            setCertificates((prev) => prev.filter((_, i) => i !== deleteIndex));
-        }
-        if (deleteTarget === "experience") {
-            setExperiences((prev) => prev.filter((_, i) => i !== deleteIndex));
-        }
+        try {
+            if (deleteTarget === "education") {
+                const nextList = educationList.filter((_, i) => i !== deleteIndex);
+                await savePortfolioSection("education", toEducationPayload(nextList));
+                setEducationList(nextList);
+            }
 
-        setDeleteIndex(null);
-        setDeleteTarget(null);
-        setShowDelete(false);
-        setShowSave(true);
+            if (deleteTarget === "skills") {
+                const nextList = skills.filter((_, i) => i !== deleteIndex);
+                await savePortfolioSection("skills", toSkillsPayload(nextList));
+                setSkills(nextList);
+            }
+
+            if (deleteTarget === "certificate") {
+                const nextList = certificates.filter((_, i) => i !== deleteIndex);
+                await savePortfolioSection("certificate", toCertificatesPayload(nextList));
+                setCertificates(nextList);
+            }
+
+            if (deleteTarget === "experience") {
+                const nextList = experiences.filter((_, i) => i !== deleteIndex);
+                await savePortfolioSection("experience", toExperiencesPayload(nextList));
+                setExperiences(nextList);
+            }
+
+            setDeleteIndex(null);
+            setDeleteTarget(null);
+            setShowDelete(false);
+        } catch (error: any) {
+            console.error("Failed to delete portfolio item:", error);
+            alert(error?.message || "Failed to delete item");
+        }
     }
 
     function onCloseDelete() {
@@ -667,6 +870,140 @@ export default function PortfolioPage() {
         setDeleteTarget(null);
         setShowDelete(false);
     }
+
+    // ฟังก์ชันดึงข้อมูลจาก API
+    // ค้นหาฟังก์ชัน fetchPortfolioData (ประมาณบรรทัดที่ 480) และวางทับด้วยโค้ดนี้:
+
+    const fetchPortfolioData = useCallback(async () => {
+        setIsLoading(true);
+
+        try {
+            const res = await fetch("/api/student/portfolio", {
+                method: "GET",
+                cache: "no-store",
+            });
+
+            const result = await res.json();
+
+            if (!res.ok || !result?.ok) {
+                throw new Error(result?.message || "Failed to load portfolio");
+            }
+
+            const portfolio = result?.data ?? {};
+            const info = portfolio?.student_info ?? {};
+
+            const nextForm = {
+                firstName: info.first_name || "",
+                lastName: info.last_name || "",
+                birthDate: info.birth_date || "",
+                phone: info.phone || "",
+                email: info.email || "",
+                address: info.address || "",
+                aboutMe: info.about_me || "",
+            };
+
+            setForm(nextForm);
+            setLoadedForm(nextForm);
+
+            setPhotoUrl(
+                String(
+                    info.profile_image_url ||
+                    info.avatar_image_url ||
+                    ""
+                ).trim()
+            );
+
+            setEducationList(
+                Array.isArray(portfolio.education)
+                    ? portfolio.education
+                        .map((item: any, index: number) => toEducationItem(item, index))
+                        .filter((item: EducationItem) => Boolean(item.school || item.degree || item.faculty || item.fieldOfStudy))
+                    : []
+            );
+
+            setSkills(
+                Array.isArray(portfolio.skills)
+                    ? portfolio.skills
+                        .map((item: any) => ({
+                            id: item.id || item.skill_id || makeId("skill"),
+                            name: item.name || item.skill_name || "",
+                            kind: normalizeSkillKind(item.kind || item.skill_type),
+                            source: normalizeSource(item.source),
+                            isSelected:
+                                typeof item.isSelected === "boolean" ? item.isSelected : true,
+                        }))
+                        .filter((item: SkillItem) => item.name)
+                    : []
+            );
+
+            setCertificates(
+                Array.isArray(portfolio.certificates)
+                    ? portfolio.certificates
+                        .map((item: any) => ({
+                            id: item.id || item.cert_id || makeId("certificate"),
+                            title: item.title || item.name || "",
+                            date: normalizeDate(item.date),
+                            source: normalizeSource(item.source),
+                            files: Array.isArray(item.files) ? item.files : [],
+                        }))
+                        .filter((item: CertificateItem) => item.title)
+                    : []
+            );
+
+            setExperiences(
+                Array.isArray(portfolio.experiences)
+                    ? portfolio.experiences
+                        .map((item: any) => ({
+                            id: item.id || item.exp_id || item.activity_id || makeId("experience"),
+                            period: item.period || "",
+                            title: item.title || item.activity_name || item.name || "",
+                            description:
+                                item.description || item.detail || item.activity_description || "",
+                            source: normalizeSource(item.source),
+                            files: Array.isArray(item.files) ? item.files : [],
+                        }))
+                        .filter((item: ExperienceItem) => item.title)
+                    : []
+            );
+        } catch (error) {
+            console.error("Failed to fetch portfolio:", error);
+
+            setForm(initialPersonalForm);
+            setLoadedForm(initialPersonalForm);
+            setEducationList([]);
+            setSkills([]);
+            setCertificates([]);
+            setExperiences([]);
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchPortfolioData();
+    }, [fetchPortfolioData]);
+
+    // ฟังก์ชันบันทึกข้อมูล (ตัวอย่างสำหรับ Personal Info)
+    async function onSavePersonal() {
+        try {
+            const payload = {
+                first_name: form.firstName,
+                last_name: form.lastName,
+                about_me: form.aboutMe,
+                phone: form.phone,
+                email: form.email,
+                address: form.address,
+                birth_date: form.birthDate,
+            };
+
+            await savePortfolioSection("info", payload);
+            setLoadedForm(form);
+        } catch (error: any) {
+            console.error("Save failed:", error);
+            alert(error?.message || "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้");
+        }
+    }
+    if (isLoading) return <div>กำลังโหลดข้อมูล...</div>;
 
     return (
         <div className={styles.page}>
@@ -725,7 +1062,7 @@ export default function PortfolioPage() {
                             </div>
 
                             <div className={styles.confirmButton}>
-                                <button type="button" className={styles.okButtonIcon} onClick={onSavePersonal}>
+                                <button type="button" className={styles.okButtonIcon} onClick={onSavePersonal} disabled={isSaving}>
                                     <img src="/images/icons/button01-icon.png" alt="Save" className={styles.confirmBtnIcon} />
                                 </button>
 
@@ -741,16 +1078,12 @@ export default function PortfolioPage() {
                             <div className={styles.editorScrollArea}>
                                 <div className={styles.educationEditorList}>
                                     {educationList.map((item, index) => (
-                                        <div key={`${item}-${index}`} className={styles.educationEditorRow}>
+                                        <div key={`${item.id}-${index}`} className={styles.educationEditorRow}>
                                             <div className={styles.educationEditorInputWrap}>
                                                 <input
                                                     className={styles.educationEditorInput}
-                                                    value={item}
-                                                    onChange={(e) => {
-                                                        const next = [...educationList];
-                                                        next[index] = e.target.value;
-                                                        setEducationList(next);
-                                                    }}
+                                                    value={buildEducationLabel(item)}
+                                                    readOnly
                                                 />
                                             </div>
 
@@ -774,49 +1107,49 @@ export default function PortfolioPage() {
                         <>
                             <div className={styles.cardTitle}>Add Education Information</div>
 
-<div className={styles.editorScrollArea}>
-                            <div className={styles.addEducationForm}>
-                                <div className={styles.field}>
-                                    <label className={styles.label}>Educational institution</label>
-                                    <input className={styles.input} value={educationForm.school} onChange={(e) => updateEducationForm("school", e.target.value)} />
-                                </div>
-
-                                <div className={styles.field}>
-                                    <label className={styles.label}>Degree Level</label>
-                                    <input className={styles.input} value={educationForm.degree} onChange={(e) => updateEducationForm("degree", e.target.value)} />
-                                </div>
-
-                                <div className={styles.field}>
-                                    <label className={styles.label}>Faculty</label>
-                                    <input className={styles.input} value={educationForm.faculty} onChange={(e) => updateEducationForm("faculty", e.target.value)} />
-                                </div>
-
-                                <div className={styles.field}>
-                                    <label className={styles.label}>Field of Study / Major</label>
-                                    <input className={styles.input} value={educationForm.fieldOfStudy} onChange={(e) => updateEducationForm("fieldOfStudy", e.target.value)} />
-                                </div>
-
-                                <div className={styles.formYearRow}>
+                            <div className={styles.editorScrollArea}>
+                                <div className={styles.addEducationForm}>
                                     <div className={styles.field}>
-                                        <label className={styles.label}>Start year</label>
-                                        <input className={styles.input} value={educationForm.startYear} onChange={(e) => updateEducationForm("startYear", e.target.value)} />
+                                        <label className={styles.label}>Educational institution</label>
+                                        <input className={styles.input} value={educationForm.school} onChange={(e) => updateEducationForm("school", e.target.value)} />
                                     </div>
 
                                     <div className={styles.field}>
-                                        <label className={styles.label}>End year/Currently</label>
-                                        <input className={styles.input} value={educationForm.endYear} onChange={(e) => updateEducationForm("endYear", e.target.value)} />
+                                        <label className={styles.label}>Degree Level</label>
+                                        <input className={styles.input} value={educationForm.degree} onChange={(e) => updateEducationForm("degree", e.target.value)} />
                                     </div>
-                                </div>
 
-                                <div className={styles.field}>
-                                    <label className={styles.label}>GPA</label>
-                                    <input className={styles.input} value={educationForm.gpa} onChange={(e) => updateEducationForm("gpa", e.target.value)} />
+                                    <div className={styles.field}>
+                                        <label className={styles.label}>Faculty</label>
+                                        <input className={styles.input} value={educationForm.faculty} onChange={(e) => updateEducationForm("faculty", e.target.value)} />
+                                    </div>
+
+                                    <div className={styles.field}>
+                                        <label className={styles.label}>Field of Study / Major</label>
+                                        <input className={styles.input} value={educationForm.fieldOfStudy} onChange={(e) => updateEducationForm("fieldOfStudy", e.target.value)} />
+                                    </div>
+
+                                    <div className={styles.formYearRow}>
+                                        <div className={styles.field}>
+                                            <label className={styles.label}>Start year</label>
+                                            <input className={styles.input} value={educationForm.startYear} onChange={(e) => updateEducationForm("startYear", e.target.value)} />
+                                        </div>
+
+                                        <div className={styles.field}>
+                                            <label className={styles.label}>End year/Currently</label>
+                                            <input className={styles.input} value={educationForm.endYear} onChange={(e) => updateEducationForm("endYear", e.target.value)} />
+                                        </div>
+                                    </div>
+
+                                    <div className={styles.field}>
+                                        <label className={styles.label}>GPA</label>
+                                        <input className={styles.input} value={educationForm.gpa} onChange={(e) => updateEducationForm("gpa", e.target.value)} />
+                                    </div>
                                 </div>
                             </div>
-</div>
 
                             <div className={styles.confirmButton}>
-                                <button type="button" className={styles.okButtonIcon} onClick={onSaveEducationForm}>
+                                <button type="button" className={styles.okButtonIcon} onClick={onSaveEducationForm} disabled={isSaving}>
                                     <img src="/images/icons/button01-icon.png" alt="Save" className={styles.confirmBtnIcon} />
                                 </button>
 
@@ -933,7 +1266,7 @@ export default function PortfolioPage() {
                             </div>
 
                             <div className={styles.confirmButton}>
-                                <button type="button" className={styles.okButtonIcon} onClick={onSaveSkillForm}>
+                                <button type="button" className={styles.okButtonIcon} onClick={onSaveSkillForm} disabled={isSaving}>
                                     <img src="/images/icons/button01-icon.png" alt="Save" className={styles.confirmBtnIcon} />
                                 </button>
 
@@ -1063,7 +1396,7 @@ export default function PortfolioPage() {
                             </div>
 
                             <div className={styles.confirmButton}>
-                                <button type="button" className={styles.okButtonIcon} onClick={onSaveCertificateForm}>
+                                <button type="button" className={styles.okButtonIcon} onClick={onSaveCertificateForm} disabled={isSaving}>
                                     <img src="/images/icons/button01-icon.png" alt="Save" className={styles.confirmBtnIcon} />
                                 </button>
 
@@ -1201,7 +1534,7 @@ export default function PortfolioPage() {
                             </div>
 
                             <div className={styles.confirmButton}>
-                                <button type="button" className={styles.okButtonIcon} onClick={onSaveExperienceForm}>
+                                <button type="button" className={styles.okButtonIcon} onClick={onSaveExperienceForm} disabled={isSaving}>
                                     <img src="/images/icons/button01-icon.png" alt="Save" className={styles.confirmBtnIcon} />
                                 </button>
 
@@ -1250,8 +1583,8 @@ export default function PortfolioPage() {
                                 <div className={styles.blockTitle}>Education</div>
                             </div>
                             <div className={styles.blockBody}>
-                                {educationList.map((item, index) => (
-                                    <div key={`${item}-${index}`} className={styles.simpleLine}>{item}</div>
+                                {educationList.map((item) => (
+                                    <div key={item.id} className={styles.simpleLine}>{buildEducationLabel(item)}</div>
                                 ))}
                             </div>
                         </div>
@@ -1334,7 +1667,7 @@ export default function PortfolioPage() {
 
                         <div className={styles.deleteActions}>
                             <button type="button" className={styles.deleteNoBtn} onClick={onCloseDelete}>No</button>
-                            <button type="button" className={styles.deleteYesBtn} onClick={onConfirmDelete}>Yes</button>
+                            <button type="button" className={styles.deleteYesBtn} onClick={onConfirmDelete} disabled={isSaving}>Yes</button>
                         </div>
                     </div>
                 </div>

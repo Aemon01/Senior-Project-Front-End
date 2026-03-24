@@ -1603,7 +1603,6 @@ body {
 ------------------------- */
 .avatarCard {
   padding: 16px;
-  /* border: 1.4px solid rgba(0, 0, 0, 0.14); */
   border-radius: 2px;
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
   background-color: #fefefe;
@@ -1612,22 +1611,35 @@ body {
 }
 
 .avatarBig {
-  height: 240px;
+  height: 300px;
   box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.25) inset;
   border-radius: 2px;
   background-color: #f7f7f7;
   border: 0.5px solid rgba(42, 42, 42, 0.5);
   box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  overflow: hidden;
+  position: relative;
 }
 
-.avatarStub {
-  width: 150px;
-  height: 190px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.02));
+.avatarBigStage {
+  width: 100%;
+  height: 100%;
+  padding: 10px 8px;
+  box-sizing: border-box;
+}
+
+.avatarViewport {
+  width: 100%;
+  height: 100%;
+}
+
+.avatarEmpty {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.45);
 }
 
 .avatarThumbRow {
@@ -1638,7 +1650,7 @@ body {
 }
 
 .avatarThumbCard {
-  width: 110px;
+  width: 100px;
   box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.25) inset;
   border-radius: 2px;
   background-color: #f7f7f7;
@@ -1646,6 +1658,12 @@ body {
   box-sizing: border-box;
   padding: 10px 10px 8px;
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
+}
+
+.avatarThumbCard:disabled {
+  cursor: wait;
 }
 
 .avatarThumbCardOn {
@@ -1657,6 +1675,7 @@ body {
   border-radius: 1px;
   background: rgba(0, 0, 0, 0.06);
   border: 1px solid rgba(0, 0, 0, 0.1);
+  overflow: hidden;
 }
 
 .avatarCheck {
@@ -1680,6 +1699,13 @@ body {
 .checkBoxOn {
   background: rgba(120, 190, 140, 0.2);
   border-color: rgba(120, 190, 140, 0.8);
+}
+
+.avatarSavingText {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 11px;
+  color: rgba(0, 0, 0, 0.55);
 }
 
 /* -------------------------

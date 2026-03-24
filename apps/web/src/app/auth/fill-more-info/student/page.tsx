@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import styles from "./page.module.css";
 import { useRouter } from "next/navigation";
 
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, useAnimations, useGLTF } from "@react-three/drei";
-import { Suspense, useRef } from "react";
+import { Suspense } from "react";
 import * as THREE from "three";
 
 type OptionItem = { id: string; name: string };
@@ -38,10 +38,8 @@ function AnimatedGLB({ url }: { url: string }) {
   const { actions, names, mixer } = useAnimations(gltf.animations, group);
 
   useEffect(() => {
-    // ✅ ถ้าไฟล์ไม่มี animation: แสดงโมเดลเฉยๆ (ไม่ error)
     if (!names?.length) return;
 
-    // stop + reset กันท่าผสมค้าง
     names.forEach((n) => {
       const a = actions[n];
       if (!a) return;
@@ -78,7 +76,6 @@ function AnimatedGLB({ url }: { url: string }) {
   );
 }
 
-// error boundary แบบเล็ก
 function ErrorCatcher({
   children,
   onError,
@@ -104,7 +101,9 @@ function Avatar3D({ modelUrl }: { modelUrl: string }) {
     } catch { }
   }, [modelUrl]);
 
-  if (failed) return <div className={styles.avatarPlaceholder}>Model load failed</div>;
+  if (failed) {
+    return <div className={styles.avatarPlaceholder}>Model load failed</div>;
+  }
 
   return (
     <div className={styles.avatarFrame3d} aria-label="Avatar 3D frame">
@@ -115,7 +114,6 @@ function Avatar3D({ modelUrl }: { modelUrl: string }) {
         <Suspense fallback={null}>
           <group position={[0, -1.3, 0]} scale={2.0} rotation={[-0.5, -0.5, 0]}>
             <ErrorCatcher onError={() => setFailed(true)}>
-              {/* ✅ key บังคับ remount เวลาเปลี่ยน modelUrl */}
               <AnimatedGLB key={modelUrl} url={modelUrl} />
             </ErrorCatcher>
           </group>
@@ -197,11 +195,22 @@ function SelectorBox({
   );
 }
 
+function normalizeOptionResponse(json: any): OptionItem[] {
+  if (Array.isArray(json)) return json;
+  if (Array.isArray(json?.data)) return json.data;
+  return [];
+}
+
+function normalizeAvatarResponse(json: any): AvatarOption[] {
+  if (Array.isArray(json)) return json;
+  if (Array.isArray(json?.data)) return json.data;
+  return [];
+}
+
 export default function FillMoreInfoStudentPage() {
   const [openJob, setOpenJob] = useState(false);
   const [openSkill, setOpenSkill] = useState(false);
 
-  // ✅ avatar from DB (เหมือน employees)
   const [avatarOptions, setAvatarOptions] = useState<AvatarOption[]>([]);
   const [loadingAvatars, setLoadingAvatars] = useState(true);
   const [avatarId, setAvatarId] = useState<string | null>(null);
@@ -222,39 +231,105 @@ export default function FillMoreInfoStudentPage() {
   const [jobSelected, setJobSelected] = useState<string[]>([]);
   const [skillSelected, setSkillSelected] = useState<string[]>([]);
 
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const router = useRouter();
+
   const setField =
     (k: keyof typeof form) =>
       (e: ChangeEvent<HTMLInputElement>) =>
         setForm((p) => ({ ...p, [k]: e.target.value }));
 
-  // jobs/skills
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const r = await fetch("/api/student", { cache: "no-store" });
+        const json = await r.json().catch(() => null);
+
+        if (cancelled) return;
+
+        if (!r.ok || !json?.ok) {
+          setErr(json?.message || "Load student failed");
+          return;
+        }
+
+        const d = json?.data?.student_info ?? json?.data ?? {};
+
+        setForm({
+          firstName: d?.first_name ?? "",
+          lastName: d?.last_name ?? "",
+          birthDate: d?.birth_date ? String(d.birth_date).slice(0, 10) : "",
+          phone: d?.phone ?? "",
+          university: d?.university ?? "",
+          faculty: d?.faculty ?? "",
+          major: d?.major ?? "",
+          year: d?.year !== null && d?.year !== undefined ? String(d.year) : "",
+        });
+
+        setAvatarId(d?.avatar_choice ?? null);
+        setSkillSelected(Array.isArray(d?.skill) ? d.skill : []);
+        setJobSelected(Array.isArray(d?.interests) ? d.interests : []);
+      } catch (e: any) {
+        if (!cancelled) {
+          setErr(e?.message || "Load student failed");
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     (async () => {
-      const [jobsRes, skillsRes] = await Promise.all([
-        fetch("/api/options/jobs", { cache: "no-store" }),
-        fetch("/api/options/skills", { cache: "no-store" }),
-      ]);
+      try {
+        const [jobsRes, skillsRes] = await Promise.all([
+          fetch("/api/options/jobs", { cache: "no-store" }),
+          fetch("/api/options/skills", { cache: "no-store" }),
+        ]);
 
-      if (jobsRes.ok) setJobOptions(await jobsRes.json());
-      if (skillsRes.ok) setSkillOptions(await skillsRes.json());
+        if (jobsRes.ok) {
+          const jobsJson = await jobsRes.json();
+          setJobOptions(normalizeOptionResponse(jobsJson));
+        } else {
+          setJobOptions([]);
+        }
+
+        if (skillsRes.ok) {
+          const skillsJson = await skillsRes.json();
+          setSkillOptions(normalizeOptionResponse(skillsJson));
+        } else {
+          setSkillOptions([]);
+        }
+      } catch {
+        setJobOptions([]);
+        setSkillOptions([]);
+      }
     })();
   }, []);
 
-  // avatars
   useEffect(() => {
     (async () => {
       setLoadingAvatars(true);
       try {
-        const r = await fetch("/api/options/avatars/student", { cache: "no-store" })
-        if (!r.ok) return;
+        const r = await fetch("/api/options/avatars/student", { cache: "no-store" });
+        if (!r.ok) {
+          setAvatarOptions([]);
+          return;
+        }
 
-        const data: AvatarOption[] = await r.json();
+        const json = await r.json();
+        const data = normalizeAvatarResponse(json);
+
         setAvatarOptions(data);
 
         const firstId = data?.[0]?.id ?? null;
         setAvatarId((prev) => prev ?? firstId);
 
-        // preload ลดกระตุก
         data.forEach((a) => {
           try {
             useGLTF.preload(a.modelUrl);
@@ -297,10 +372,6 @@ export default function FillMoreInfoStudentPage() {
     setAvatarId(avatarOptions[nextIdx].id);
   };
 
-  const router = useRouter();
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
   const handleNext = async () => {
     setErr(null);
 
@@ -309,33 +380,48 @@ export default function FillMoreInfoStudentPage() {
       return;
     }
 
-    setSaving(true);
-    try {
-      const payload = {
-        first_name: form.firstName.trim(),
-        last_name: form.lastName.trim(),
-        birth_date: toRFC3339Date(form.birthDate),    // แนะนำ YYYY-MM-DD
-        phone: form.phone.trim(),
-        university: form.university.trim(),
-        faculty: form.faculty.trim(),
-        major: form.major.trim(),
-        year: Number(form.year || 0),
-        avatar_choice: avatarId,
-        // ถ้า backend ยังไม่รองรับ job_ids/skill_ids ให้ย้ายไปเก็บใน profile jsonb แทน
-        job_ids: jobSelected,
-        skill_ids: skillSelected,
-        is_profile_complete: true,
-      };
+    const yearNumber =
+      form.year.trim() === "" ? null : Number.parseInt(form.year.trim(), 10);
 
+    if (form.year.trim() !== "" && Number.isNaN(yearNumber as number)) {
+      setErr("Year must be a number");
+      return;
+    }
+
+    const payload = {
+      first_name: form.firstName.trim(),
+      last_name: form.lastName.trim(),
+      birth_date: form.birthDate || null,
+      phone: form.phone.trim() || null,
+      university: form.university.trim() || null,
+      faculty: form.faculty.trim() || null,
+      major: form.major.trim() || null,
+      year: yearNumber,
+      avatar_choice: avatarId,
+      interests: jobSelected,
+      skill: skillSelected,
+    };
+
+    setSaving(true);
+
+    try {
       const r = await fetch("/api/student", {
-        method: "POST",
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
       const res = await r.json().catch(() => null);
+
       if (!r.ok || !res?.ok) {
-        throw new Error(res?.detail || res?.message || "Save failed");
+        const detail =
+          typeof res?.detail === "string"
+            ? res.detail
+            : res?.detail
+              ? JSON.stringify(res.detail)
+              : null;
+
+        throw new Error(detail || res?.message || "Save failed");
       }
 
       router.push("/student/explore");
@@ -345,25 +431,6 @@ export default function FillMoreInfoStudentPage() {
       setSaving(false);
     }
   };
-
-  function toRFC3339Date(input: string) {
-    const s = (input || "").trim();
-
-    // 1) ถ้าเป็น YYYY-MM-DD → แปลงเป็น 00:00:00Z
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return `${s}T00:00:00Z`;
-
-    // 2) ถ้าเป็น DD/MM/YYYY หรือ DD-MM-YYYY → แปลงเป็น YYYY-MM-DDT00:00:00Z
-    const m = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
-    if (m) {
-      const dd = String(m[1]).padStart(2, "0");
-      const mm = String(m[2]).padStart(2, "0");
-      const yyyy = m[3];
-      return `${yyyy}-${mm}-${dd}T00:00:00Z`;
-    }
-
-    // 3) ถ้ามาเป็น ISO datetime อยู่แล้ว ให้ส่งตรง
-    return s;
-  }
 
   return (
     <div className={styles.page}>
@@ -390,15 +457,24 @@ export default function FillMoreInfoStudentPage() {
       </div>
 
       <main className={styles.main}>
-        {/* LEFT */}
         <section className={styles.card}>
           <h1 className={styles.title}>Student</h1>
 
           <div className={styles.formScroll}>
             <div className={styles.formBlock}>
               <div className={styles.grid2}>
-                <input className={styles.input} placeholder="First name" value={form.firstName} onChange={setField("firstName")} />
-                <input className={styles.input} placeholder="Last name" value={form.lastName} onChange={setField("lastName")} />
+                <input
+                  className={styles.input}
+                  placeholder="First name"
+                  value={form.firstName}
+                  onChange={setField("firstName")}
+                />
+                <input
+                  className={styles.input}
+                  placeholder="Last name"
+                  value={form.lastName}
+                  onChange={setField("lastName")}
+                />
               </div>
 
               <div className={styles.grid2}>
@@ -408,41 +484,85 @@ export default function FillMoreInfoStudentPage() {
                   value={form.birthDate}
                   onChange={setField("birthDate")}
                 />
-                <input className={styles.input} placeholder="Phone number" value={form.phone} onChange={setField("phone")} />
+                <input
+                  className={styles.input}
+                  placeholder="Phone number"
+                  value={form.phone}
+                  onChange={setField("phone")}
+                />
               </div>
 
               <div className={styles.hr} />
 
               <div className={styles.stack}>
-                <input className={styles.input} placeholder="University" value={form.university} onChange={setField("university")} />
-                <input className={styles.input} placeholder="Faculty" value={form.faculty} onChange={setField("faculty")} />
+                <input
+                  className={styles.input}
+                  placeholder="University"
+                  value={form.university}
+                  onChange={setField("university")}
+                />
+                <input
+                  className={styles.input}
+                  placeholder="Faculty"
+                  value={form.faculty}
+                  onChange={setField("faculty")}
+                />
               </div>
 
               <div className={styles.grid2}>
-                <input className={styles.input} placeholder="Major" value={form.major} onChange={setField("major")} />
-                <input className={styles.input} placeholder="Year" value={form.year} onChange={setField("year")} />
+                <input
+                  className={styles.input}
+                  placeholder="Major"
+                  value={form.major}
+                  onChange={setField("major")}
+                />
+                <input
+                  className={styles.input}
+                  placeholder="Year"
+                  value={form.year}
+                  onChange={setField("year")}
+                  inputMode="numeric"
+                />
               </div>
 
               <div className={styles.hr} />
 
-              <button type="button" className={styles.pickField} onClick={() => setOpenJob((v) => !v)}>
+              <button
+                type="button"
+                className={styles.pickField}
+                onClick={() => setOpenJob((v) => !v)}
+              >
                 <span className={styles.pickPlaceholder}>
                   {jobSelected.length ? `${jobSelected.length} selected` : "Job of interest"}
                 </span>
               </button>
 
               {openJob && (
-                <SelectorBox title="Job of interest" options={jobOptions} selectedIds={jobSelected} onToggle={toggleJob} />
+                <SelectorBox
+                  title="Job of interest"
+                  options={jobOptions}
+                  selectedIds={jobSelected}
+                  onToggle={toggleJob}
+                />
               )}
 
-              <button type="button" className={styles.pickField} onClick={() => setOpenSkill((v) => !v)}>
+              <button
+                type="button"
+                className={styles.pickField}
+                onClick={() => setOpenSkill((v) => !v)}
+              >
                 <span className={styles.pickPlaceholder}>
                   {skillSelected.length ? `${skillSelected.length} selected` : "Your skills"}
                 </span>
               </button>
 
               {openSkill && (
-                <SelectorBox title="Your skills" options={skillOptions} selectedIds={skillSelected} onToggle={toggleSkill} />
+                <SelectorBox
+                  title="Your skills"
+                  options={skillOptions}
+                  selectedIds={skillSelected}
+                  onToggle={toggleSkill}
+                />
               )}
 
               <div className={styles.hr} />
@@ -450,10 +570,14 @@ export default function FillMoreInfoStudentPage() {
           </div>
         </section>
 
-        {/* RIGHT (เหมือน employees) */}
         <section className={styles.avatarStage} aria-label="Avatar">
           <div className={styles.avatarRow}>
-            <button className={styles.iconBtn} type="button" onClick={prevAvatar} aria-label="Previous">
+            <button
+              className={styles.iconBtn}
+              type="button"
+              onClick={prevAvatar}
+              aria-label="Previous"
+            >
               ◀
             </button>
 
@@ -461,13 +585,21 @@ export default function FillMoreInfoStudentPage() {
               {loadingAvatars ? (
                 <div className={styles.avatarPlaceholder}>Loading...</div>
               ) : activeAvatar ? (
-                <Avatar3D modelUrl={activeAvatar.modelUrl} />
+                <Avatar3D
+                  key={`${activeAvatar.id}-${activeAvatar.modelUrl}`}
+                  modelUrl={activeAvatar.modelUrl}
+                />
               ) : (
                 <div className={styles.avatarPlaceholder}>No avatars</div>
               )}
             </div>
 
-            <button className={styles.iconBtn} type="button" onClick={nextAvatar} aria-label="Next">
+            <button
+              className={styles.iconBtn}
+              type="button"
+              onClick={nextAvatar}
+              aria-label="Next"
+            >
               ▶
             </button>
           </div>
@@ -487,6 +619,7 @@ export default function FillMoreInfoStudentPage() {
             })}
           </div>
         </section>
+
         <div className={styles.nextWrap}>
           <button
             className={styles.nextBtn}
@@ -497,7 +630,11 @@ export default function FillMoreInfoStudentPage() {
             {saving ? "Saving..." : "Next"}
           </button>
 
-          {err && <p className={styles.note} style={{ marginTop: 8 }}>{err}</p>}
+          {err && (
+            <p className={styles.note} style={{ marginTop: 8 }}>
+              {err}
+            </p>
+          )}
         </div>
       </main>
     </div>

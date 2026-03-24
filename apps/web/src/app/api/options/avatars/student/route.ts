@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 const ALLOWED_MODELS = new Set([
   "student-avatars/avatar0.glb",
-  "student-avatars/avatar2.glb",
+  // "student-avatars/avatar2.glb",
   "student-avatars/avatar4.glb",
   "student-avatars/avatar6.glb",
 ]);

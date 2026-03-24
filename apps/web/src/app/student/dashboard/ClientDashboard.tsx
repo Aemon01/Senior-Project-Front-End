@@ -1,12 +1,26 @@
 "use client";
 
 import styles from "./ClientDashboard.module.css";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Avatar3D from "@/components/shared/Avatar3D";
+
+import StudentCalendar, {
+  type StudentCalendarSiteEvent,
+  type StudentCalendarTrackColor,
+} from "@/components/shared/student/StudentCalendar";
 
 /* =======================
    Types
 ======================= */
+type Skill = { id: string; name: string; percent: number };
+
+type ActivityStatusKey =
+  | "completed"
+  | "inProgress"
+  | "registered"
+  | "incomplete";
+
 type StudentMe = {
   name: string;
   bio: string;
@@ -17,28 +31,126 @@ type StudentMe = {
   level: number;
   xp: number;
   xpMax: number;
+  firstName: string;
+  lastName: string;
+  birthDate: string;
+  university: string;
+  faculty: string;
+  major: string;
+  year: string;
+  interests: string[];
+  skill: string[];
+  profileImageUrl: string | null;
+  avatarModelUrl: string | null;
+  avatarChoiceId: string | null;
 };
 
-type Skill = { id: string; name: string; percent: number };
-type ModalKind = "editProfile" | "badges" | "certificate" | null;
+type AvatarOption = {
+  id: string;
+  modelUrl: string;
+  name: string;
+  unlockLevel?: number;
+};
 
+type ActivityItem = {
+  id: string;
+  title: string;
+  sub: string;
+  xp: number;
+  status: string;
+};
+
+type MissionItem = {
+  id: string;
+  title: string;
+  startAt: string;
+  endAt: string;
+};
+
+type ScheduleItem = StudentCalendarSiteEvent & {
+  sub: string;
+};
+
+type CompletionSegment = {
+  key: ActivityStatusKey;
+  title: string;
+  count: number;
+  color: string;
+  colorClass: string;
+  items: string[];
+};
+
+type DashboardApiResponse = {
+  ok: boolean;
+  data?: {
+    student_info?: {
+      user_id?: string;
+      std_id?: string;
+      first_name?: string;
+      last_name?: string;
+      birth_date?: string;
+      phone?: string;
+      email?: string;
+      address?: string;
+      about_me?: string;
+      university?: string;
+      faculty?: string;
+      major?: string;
+      year?: number | string;
+      interests?: string[];
+      skill?: string[];
+      level?: number;
+      total_exp?: number;
+      xp_max?: number;
+      avatar_choice?: string | null;
+      profile_image_url?: string | null;
+      avatar_model_url?: string | null;
+      avatar_image_url?: string | null;
+      is_profile_complete?: boolean;
+      profile?: {
+        bio?: string;
+        email?: string;
+        headline?: string;
+      } | null;
+      achievement?: Record<string, any> | null;
+      portfolio?: Record<string, any> | null;
+    };
+    activities_status?: {
+      completed_number?: number;
+      failed_number?: number;
+      registered_number?: number;
+      waiting_feedback_number?: number;
+    };
+    done_activities?: Array<{
+      activity_id?: string;
+      activity_name?: string;
+      activity_type?: string;
+      status?: string;
+      xp?: number;
+    }>;
+    schedules?: Array<{
+      activity_id?: string;
+      activity_name?: string;
+      activity_type?: string;
+      start_at?: string;
+      end_at?: string;
+    }>;
+    today_missions?: Array<{
+      activity_id?: string;
+      activity_name?: string;
+      run_start_at?: string;
+      run_end_at?: string;
+    }>;
+  };
+  message?: string;
+};
+
+type ModalKind = "editProfile" | "badges" | "certificate" | null;
 type TileId = "badges" | "certificate" | "portfolio";
 
 /* =======================
-   Mock Data (replace w/ API later)
+   Static UI Data
 ======================= */
-const MOCK_ME: StudentMe = {
-  name: "Carolyn Stewart",
-  bio: "Experienced professional in design bringing fresh perspectives. Committed to creating impactful solutions and driving positive change.",
-  phone: "123-745-9803",
-  email: "carolyn.stewart@example.com",
-  address: "1754 Maple Drive Houston, PA 71107",
-  education: "Mahidol University",
-  level: 10,
-  xp: 500,
-  xpMax: 1000,
-};
-
 const LEVEL_BADGES = [
   "/images/icons/badge01.png",
   "/images/icons/badge02.png",
@@ -47,32 +159,10 @@ const LEVEL_BADGES = [
   "/images/icons/badge05.png",
 ];
 
-
 const BADGE_TILES: Array<{ id: TileId; label: string; image: string; alt: string }> = [
   { id: "badges", label: "badges", image: "/images/icons/porttfolio-icon.png", alt: "Badges" },
   { id: "certificate", label: "certificate", image: "/images/icons/porttfolio-icon.png", alt: "Certificate" },
   { id: "portfolio", label: "portfolio", image: "/images/icons/porttfolio-icon.png", alt: "Portfolio" },
-];
-
-const ACTIVITIES = [
-  { id: "a1", title: "Frontend Basics & Web Terminology", sub: "Quiz", xp: 20 },
-  { id: "a2", title: "UI Layout Explanation Task", sub: "Task", xp: 15 },
-  { id: "a3", title: "Responsive Web Page Workshop", sub: "Workshop", xp: 50 },
-];
-
-const MOCK_SKILLS: Skill[] = [
-  { id: "s1", name: "HTML", percent: 85 },
-  { id: "s2", name: "CSS", percent: 70 },
-  { id: "s3", name: "JavaScript", percent: 55 },
-  { id: "s4", name: "React", percent: 42 },
-  { id: "s5", name: "TypeScript", percent: 35 },
-  { id: "s6", name: "UI/UX", percent: 60 },
-  { id: "s7", name: "Git", percent: 50 },
-  { id: "s8", name: "API", percent: 40 },
-  { id: "s9", name: "Testing", percent: 25 },
-  { id: "s10", name: "SQL", percent: 45 },
-  { id: "s11", name: "Cloud", percent: 20 },
-  { id: "s12", name: "Soft Skills", percent: 65 },
 ];
 
 /* =======================
@@ -82,6 +172,289 @@ function cx(...arr: Array<string | false | undefined | null>) {
   return arr.filter(Boolean).join(" ");
 }
 
+function toSkillPercent(name: string, index: number) {
+  const preset: Record<string, number> = {
+    HTML: 85,
+    CSS: 70,
+    JavaScript: 55,
+    React: 42,
+    TypeScript: 35,
+    "UI/UX": 60,
+    Git: 50,
+    API: 40,
+    Testing: 25,
+    SQL: 45,
+    Cloud: 20,
+    "Soft Skills": 65,
+  };
+
+  return preset[name] ?? Math.max(20, 80 - index * 5);
+}
+
+function safeDate(value?: string) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString("en-GB");
+}
+
+function shortDateTime(value?: string) {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+const PUBLIC_ASSET_BASE =
+  process.env.NEXT_PUBLIC_S3_PUBLIC_BASE_URL ||
+  "https://vcep-assets-dev.s3.ap-southeast-2.amazonaws.com";
+
+function toPublicAssetUrl(value?: string | null) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+  return `${PUBLIC_ASSET_BASE.replace(/\/+$/, "")}/${raw.replace(/^\/+/, "")}`;
+}
+
+function normalizeAvatarOption(item: any, index: number): AvatarOption | null {
+  const id = String(item?.id ?? item?.avatar_id ?? item?.avatar_choice ?? "").trim();
+  const modelUrl = toPublicAssetUrl(
+    item?.modelUrl ?? item?.model_url ?? item?.avatar_model ?? item?.glb_url ?? null
+  );
+
+  if (!id || !modelUrl) return null;
+
+  return {
+    id,
+    modelUrl,
+    name: String(item?.name ?? item?.avatar_name ?? `Avatar ${index + 1}`).trim() || `Avatar ${index + 1}`,
+    unlockLevel:
+      item?.unlockLevel !== undefined && item?.unlockLevel !== null
+        ? Number(item.unlockLevel)
+        : item?.unlock_level !== undefined && item?.unlock_level !== null
+          ? Number(item.unlock_level)
+          : undefined,
+  };
+}
+
+function normalizeAvatarOptions(json: any): AvatarOption[] {
+  const raw: any[] = Array.isArray(json)
+    ? json
+    : Array.isArray(json?.data)
+      ? json.data
+      : Array.isArray(json?.avatars)
+        ? json.avatars
+        : [];
+
+  return raw
+    .map((item: any, index: number) => normalizeAvatarOption(item, index))
+    .filter(Boolean) as AvatarOption[];
+}
+
+function limitAvatarOptions(options: AvatarOption[], selectedId: string | null, limit = 3) {
+  if (options.length <= limit) return options;
+
+  const top = options.slice(0, limit);
+  if (!selectedId || top.some((option) => option.id === selectedId)) return top;
+
+  const selected = options.find((option) => option.id === selectedId);
+  if (!selected) return top;
+
+  return [...top.slice(0, limit - 1), selected];
+}
+
+function mapStudentToDashboard(api: DashboardApiResponse["data"]) {
+  const student = api?.student_info ?? {};
+  const firstName = student.first_name?.trim() || "";
+  const lastName = student.last_name?.trim() || "";
+  const fullName = `${firstName} ${lastName}`.trim() || "Student";
+
+  const university = student.university?.trim() || "";
+  const faculty = student.faculty?.trim() || "";
+  const major = student.major?.trim() || "";
+  const year =
+    student.year !== null && student.year !== undefined && String(student.year).trim() !== ""
+      ? String(student.year)
+      : "";
+
+  const interests = Array.isArray(student.interests) ? student.interests : [];
+  const skillsFromApi = Array.isArray(student.skill) ? student.skill : [];
+
+  const educationParts = [university, faculty, major, year ? `Year ${year}` : ""].filter(Boolean);
+
+  const email =
+    student.email?.trim() ||
+    student.profile?.email?.trim() ||
+    "-";
+
+  const bio =
+    student.about_me?.trim() ||
+    student.profile?.bio?.trim() ||
+    student.profile?.headline?.trim() ||
+    (interests.length ? `Interests: ${interests.join(", ")}` : "Student profile");
+
+  const me: StudentMe = {
+    name: fullName,
+    bio,
+    phone: student.phone?.trim() || "-",
+    email,
+    address: student.address?.trim() || "-",
+    education: educationParts.join(" • ") || "-",
+    level: Number(student.level ?? 1),
+    xp: Number(student.total_exp ?? 0),
+    xpMax: Number(student.xp_max ?? 100),
+    firstName,
+    lastName,
+    birthDate: student.birth_date || "",
+    university,
+    faculty,
+    major,
+    year,
+    interests,
+    skill: skillsFromApi,
+    profileImageUrl: student.profile_image_url ?? student.avatar_image_url ?? null,
+    avatarModelUrl: student.avatar_model_url ?? null,
+    avatarChoiceId: student.avatar_choice ?? null,
+  };
+
+  const skills: Skill[] = skillsFromApi.map((name, index) => ({
+    id: `skill-${index}`,
+    name,
+    percent: toSkillPercent(name, index),
+  }));
+
+  const doneActivities: ActivityItem[] = Array.isArray(api?.done_activities)
+    ? api!.done_activities!.map((item, index) => ({
+      id: item.activity_id || `done-${index}`,
+      title: item.activity_name || "Activity",
+      sub: item.activity_type || "Activity",
+      xp: Number(item.xp ?? 0),
+      status: item.status || "",
+    }))
+    : [];
+
+  const schedules: ScheduleItem[] = Array.isArray(api?.schedules)
+  ? api!.schedules!.map((item: any, index) => ({
+      id: item.activity_id || `schedule-${index}`,
+      title: item.activity_name || "Schedule",
+      sub: item.activity_type || "Activity",
+      startAt: item.start_at || "",
+      endAt: item.end_at || "",
+      calendarColor: normalizeScheduleColor(item.calendar_color),
+    }))
+  : [];
+
+  const missions: MissionItem[] = Array.isArray(api?.today_missions)
+    ? api!.today_missions!.map((item, index) => ({
+      id: item.activity_id || `mission-${index}`,
+      title: item.activity_name || "Mission",
+      startAt: item.run_start_at || "",
+      endAt: item.run_end_at || "",
+    }))
+    : [];
+
+  const status = api?.activities_status ?? {};
+  const completionSegments: CompletionSegment[] = [
+    {
+      key: "completed",
+      title: "Completed",
+      count: Number(status.completed_number ?? 0),
+      color: "#9FD5A8",
+      colorClass: styles.badgeFillGreen,
+      items: doneActivities
+        .filter((x) => x.status.toLowerCase().includes("complete"))
+        .map((x) => x.title),
+    },
+    {
+      key: "incomplete",
+      title: "Incomplete",
+      count: Number(status.failed_number ?? 0),
+      color: "#E58F82",
+      colorClass: styles.badgeFillRed,
+      items: doneActivities
+        .filter((x) => x.status.toLowerCase().includes("fail"))
+        .map((x) => x.title),
+    },
+    {
+      key: "registered",
+      title: "Registered",
+      count: Number(status.registered_number ?? 0),
+      color: "#7EC6D9",
+      colorClass: styles.badgeFillBlue,
+      items: schedules.map((x) => x.title),
+    },
+    {
+      key: "inProgress",
+      title: "In Progress",
+      count: Number(status.waiting_feedback_number ?? 0),
+      color: "#F1C97B",
+      colorClass: styles.badgeFillYellowSoft,
+      items: doneActivities
+        .filter((x) => x.status.toLowerCase().includes("waiting"))
+        .map((x) => x.title),
+    },
+  ];
+
+  const xpDailyBars =
+    doneActivities.length > 0
+      ? doneActivities.slice(0, 10).map((item, idx) => ({
+        labelTop: `A${idx + 1}`,
+        labelBottom: item.sub,
+        xp: Math.max(0, Number(item.xp ?? 0)),
+      }))
+      : [
+        { labelTop: "A1", labelBottom: "No data", xp: 0 },
+        { labelTop: "A2", labelBottom: "No data", xp: 0 },
+      ];
+
+  const xpWeeklyBars =
+    missions.length > 0
+      ? missions.slice(0, 6).map((item, idx) => ({
+        labelTop: `W${idx + 1}`,
+        labelBottom: shortDateTime(item.startAt),
+        xp: 10,
+      }))
+      : [
+        { labelTop: "W1", labelBottom: "No mission", xp: 0 },
+        { labelTop: "W2", labelBottom: "No mission", xp: 0 },
+      ];
+
+  return {
+    me,
+    skills,
+    doneActivities,
+    schedules,
+    missions,
+    completionSegments,
+    xpDailyBars,
+    xpWeeklyBars,
+  };
+}
+
+function normalizeScheduleColor(value?: string | null): StudentCalendarTrackColor {
+  const raw = String(value ?? "").trim();
+  const allowed: StudentCalendarTrackColor[] = [
+    "pink",
+    "yellow",
+    "green",
+    "softPink",
+    "blue",
+    "orange",
+    "rose",
+    "greenWide",
+  ];
+
+  return allowed.includes(raw as StudentCalendarTrackColor)
+    ? (raw as StudentCalendarTrackColor)
+    : "pink";
+}
+
 /* =======================
    Page
 ======================= */
@@ -89,19 +462,20 @@ export default function ClientDashboard() {
   const router = useRouter();
 
   const [me, setMe] = useState<StudentMe | null>(null);
-  const [skills] = useState<Skill[]>(MOCK_SKILLS);
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [doneActivities, setDoneActivities] = useState<ActivityItem[]>([]);
+  const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
+  const [missions, setMissions] = useState<MissionItem[]>([]);
+  const [completionSegments, setCompletionSegments] = useState<CompletionSegment[]>([]);
+  const [xpDailyBars, setXpDailyBars] = useState<Array<{ labelTop: string; labelBottom: string; xp: number }>>([]);
+  const [xpWeeklyBars, setXpWeeklyBars] = useState<Array<{ labelTop: string; labelBottom: string; xp: number }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const avatarChoices = useMemo(
-    () => [
-      "/images/avatar%20picture/avatar1.png",
-      "/images/avatar%20picture/avatar2.png",
-      "/images/avatar%20picture/avatar3.png",
-    ],
-    []
-  );
+  const [avatarChoices, setAvatarChoices] = useState<AvatarOption[]>([]);
   const [selectedAvatar, setSelectedAvatar] = useState(0);
+  const [avatarSaving, setAvatarSaving] = useState(false);
 
-  // profile photo
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [cropOpen, setCropOpen] = useState(false);
@@ -109,6 +483,7 @@ export default function ClientDashboard() {
   const [cropZoom, setCropZoom] = useState(1);
   const [cropOffset, setCropOffset] = useState({ x: 0, y: 0 });
   const [imgNat, setImgNat] = useState({ w: 0, h: 0 });
+  const [photoSaving, setPhotoSaving] = useState(false);
 
   const cropBoxWidth = 280;
   const cropBoxHeight = 190;
@@ -117,10 +492,8 @@ export default function ClientDashboard() {
       ? Math.max(cropBoxWidth / imgNat.w, cropBoxHeight / imgNat.h)
       : 1;
 
-  // modal
   const [modal, setModal] = useState<ModalKind>(null);
 
-  // edit draft
   const [draft, setDraft] = useState({
     firstName: "",
     lastName: "",
@@ -155,16 +528,114 @@ export default function ClientDashboard() {
   }, [photoUrl]);
 
   useEffect(() => {
-    setMe(MOCK_ME);
+    let cancelled = false;
+
+    async function loadDashboard() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const [dashboardRes, avatarRes] = await Promise.all([
+          fetch("/api/student", {
+            method: "GET",
+            credentials: "include",
+            cache: "no-store",
+          }),
+          fetch("/api/options/avatars/student", {
+            method: "GET",
+            credentials: "include",
+            cache: "no-store",
+          }).catch(() => null),
+        ]);
+
+        const json: DashboardApiResponse = await dashboardRes.json();
+
+        if (!dashboardRes.ok || !json.ok || !json.data) {
+          throw new Error(json?.message || "Failed to load dashboard");
+        }
+
+        const mapped = mapStudentToDashboard(json.data);
+
+        let avatarOptions: AvatarOption[] = [];
+        if (avatarRes && avatarRes.ok) {
+          const avatarJson = await avatarRes.json();
+          avatarOptions = normalizeAvatarOptions(avatarJson);
+        }
+
+        if (!avatarOptions.length && mapped.me.avatarChoiceId && mapped.me.avatarModelUrl) {
+          avatarOptions = [
+            {
+              id: mapped.me.avatarChoiceId,
+              modelUrl: mapped.me.avatarModelUrl,
+              name: "Current avatar",
+            },
+          ];
+        }
+
+        const limitedAvatarOptions = limitAvatarOptions(avatarOptions, mapped.me.avatarChoiceId, 3);
+        const selectedIndex = Math.max(
+          0,
+          limitedAvatarOptions.findIndex((option) => option.id === mapped.me.avatarChoiceId)
+        );
+        const selectedOption = limitedAvatarOptions[selectedIndex] ?? null;
+
+        if (!cancelled) {
+          setMe(
+            selectedOption
+              ? {
+                ...mapped.me,
+                avatarChoiceId: selectedOption.id,
+                avatarModelUrl: selectedOption.modelUrl,
+              }
+              : mapped.me
+          );
+          setSkills(mapped.skills);
+          setDoneActivities(mapped.doneActivities);
+          setSchedules(mapped.schedules);
+          setMissions(mapped.missions);
+          setCompletionSegments(mapped.completionSegments);
+          setXpDailyBars(mapped.xpDailyBars);
+          setXpWeeklyBars(mapped.xpWeeklyBars);
+          setPhotoUrl(mapped.me.profileImageUrl);
+          setAvatarChoices(limitedAvatarOptions);
+          setSelectedAvatar(selectedIndex);
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setError(e?.message || "Failed to load dashboard");
+          setMe(null);
+          setSkills([]);
+          setDoneActivities([]);
+          setSchedules([]);
+          setMissions([]);
+          setCompletionSegments([]);
+          setXpDailyBars([]);
+          setXpWeeklyBars([]);
+          setAvatarChoices([]);
+          setSelectedAvatar(0);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadDashboard();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
     if (!me) return;
-    const parts = me.name.split(" ");
+
     setDraft((p) => ({
       ...p,
-      firstName: parts[0] ?? "",
-      lastName: parts.slice(1).join(" ") ?? "",
+      firstName: me.firstName,
+      lastName: me.lastName,
+      birthDate: me.birthDate,
       phone: me.phone,
       email: me.email,
       address: me.address,
@@ -179,7 +650,29 @@ export default function ClientDashboard() {
     return () => window.removeEventListener("keydown", onKey);
   }, [modal]);
 
-  if (!me) return null;
+  if (loading) {
+    return (
+      <div className={styles.page}>
+        <div style={{ padding: 24 }}>Loading dashboard...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={styles.page}>
+        <div style={{ padding: 24, color: "#b42318" }}>{error}</div>
+      </div>
+    );
+  }
+
+  if (!me) {
+    return (
+      <div className={styles.page}>
+        <div style={{ padding: 24 }}>No dashboard data</div>
+      </div>
+    );
+  }
 
   const filledMedals = Math.min(5, Math.max(0, Math.floor(me.level / 2)));
 
@@ -189,36 +682,179 @@ export default function ClientDashboard() {
 
   const openPhotoPicker = () => fileRef.current?.click();
 
+  const uploadAndSaveProfilePhoto = async (blob: Blob) => {
+    const file = new File([blob], "profile.png", {
+      type: "image/png",
+    });
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const uploadRes = await fetch("/api/student/profile-image", {
+      method: "POST",
+      body: formData,
+      credentials: "include",
+    });
+
+    const uploadJson = await uploadRes.json();
+
+    if (!uploadRes.ok || !uploadJson?.ok || !uploadJson?.key || !uploadJson?.url) {
+      throw new Error(uploadJson?.message || "Failed to upload profile image");
+    }
+
+    const saveRes = await fetch("/api/student", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({
+        profile_image_url: uploadJson.key,
+      }),
+    });
+
+    const saveJson = await saveRes.json();
+
+    if (!saveRes.ok || !saveJson?.ok) {
+      throw new Error(saveJson?.message || "Failed to save profile image");
+    }
+
+    setPhotoUrl(uploadJson.url);
+    setMe((prev) =>
+      prev
+        ? {
+          ...prev,
+          profileImageUrl: uploadJson.url,
+        }
+        : prev
+    );
+  };
+
   const onClickTile = (id: TileId) => {
     if (id === "portfolio") return router.push("/student/portfolio");
     if (id === "badges") return setModal("badges");
     if (id === "certificate") return setModal("certificate");
   };
 
-  const saveEdit = () => {
-    const fullName = `${draft.firstName} ${draft.lastName}`.trim() || me.name;
+  const handleAvatarSelect = async (idx: number) => {
+    const next = avatarChoices[idx];
+    if (!next || avatarSaving || !me) return;
 
+    const prevIndex = selectedAvatar;
+    const prevChoiceId = me.avatarChoiceId;
+    const prevModelUrl = me.avatarModelUrl;
+
+    setSelectedAvatar(idx);
     setMe((prev) =>
       prev
         ? {
           ...prev,
-          name: fullName,
-          phone: draft.phone,
-          email: draft.email,
-          address: draft.address,
-          bio: draft.about,
+          avatarChoiceId: next.id,
+          avatarModelUrl: next.modelUrl,
         }
         : prev
     );
 
-    setModal(null);
+    if (next.id === prevChoiceId) return;
+
+    try {
+      setAvatarSaving(true);
+
+      const res = await fetch("/api/student", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          avatar_choice: next.id,
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.message || "Failed to update avatar");
+      }
+    } catch (e: any) {
+      setSelectedAvatar(prevIndex);
+      setMe((prev) =>
+        prev
+          ? {
+            ...prev,
+            avatarChoiceId: prevChoiceId,
+            avatarModelUrl: prevModelUrl,
+          }
+          : prev
+      );
+      alert(e?.message || "Failed to update avatar");
+    } finally {
+      setAvatarSaving(false);
+    }
+  };
+
+  const saveEdit = async () => {
+    try {
+      const payload = {
+        first_name: draft.firstName,
+        last_name: draft.lastName,
+        birth_date: draft.birthDate,
+        phone: draft.phone,
+        email: draft.email,
+        address: draft.address,
+        about_me: draft.about,
+        avatar_choice: me.avatarChoiceId,
+        university: me.university,
+        faculty: me.faculty,
+        major: me.major,
+        year: me.year,
+        interests: me.interests,
+        skill: me.skill,
+      };
+
+      const res = await fetch("/api/student", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.message || "Failed to update profile");
+      }
+
+      const fullName = `${draft.firstName} ${draft.lastName}`.trim() || me.name;
+
+      setMe((prev) =>
+        prev
+          ? {
+            ...prev,
+            name: fullName,
+            firstName: draft.firstName,
+            lastName: draft.lastName,
+            birthDate: draft.birthDate,
+            phone: draft.phone,
+            email: draft.email,
+            address: draft.address,
+            bio: draft.about,
+          }
+          : prev
+      );
+
+      setModal(null);
+    } catch (e: any) {
+      alert(e?.message || "Failed to update profile");
+    }
   };
 
   return (
     <div className={styles.page}>
       <div className={styles.board}>
         <div className={styles.dash}>
-          {/* LEFT */}
           <div className={styles.left}>
             <TopProfileRow
               me={me}
@@ -236,22 +872,28 @@ export default function ClientDashboard() {
               onClickTile={onClickTile}
             />
 
-            <ActivityMissionSplit />
+            <ActivityMissionSplit
+              activities={doneActivities}
+              missions={missions}
+            />
 
-            <BottomSplit />
+            <BottomSplit
+              completionSegments={completionSegments}
+              dailyBars={xpDailyBars}
+              weeklyBars={xpWeeklyBars}
+            />
           </div>
 
-          {/* RIGHT */}
           <div className={styles.right}>
             <AvatarCard
               selected={selectedAvatar}
-              onSelect={setSelectedAvatar}
+              onSelect={handleAvatarSelect}
               avatarChoices={avatarChoices}
+              saving={avatarSaving}
             />
-            <CalendarCard title="October" />
+            <StudentCalendar siteEvents={schedules} />
           </div>
 
-          {/* MODALS */}
           {modal && (
             <ModalShell onClose={() => setModal(null)}>
               {modal === "editProfile" && (
@@ -272,6 +914,7 @@ export default function ClientDashboard() {
               )}
             </ModalShell>
           )}
+
           {cropOpen && cropUrl && (
             <div className={styles.cropOverlay} role="dialog" aria-modal="true">
               <div className={styles.cropModal}>
@@ -354,57 +997,66 @@ export default function ClientDashboard() {
                   <button
                     type="button"
                     className={styles.cropBtnPrimary}
+                    disabled={photoSaving}
                     onClick={async () => {
                       if (!cropUrl || !imgNat.w || !imgNat.h) return;
 
-                      const img = new Image();
-                      img.src = cropUrl;
-                      await new Promise<void>((res) => (img.onload = () => res()));
+                      try {
+                        setPhotoSaving(true);
 
-                      const Cw = cropBoxWidth;
-                      const Ch = cropBoxHeight;
+                        const img = new Image();
+                        img.src = cropUrl;
+                        await new Promise<void>((res) => (img.onload = () => res()));
 
-                      const baseScale = Math.max(Cw / imgNat.w, Ch / imgNat.h);
-                      const s = baseScale * cropZoom;
+                        const Cw = cropBoxWidth;
+                        const Ch = cropBoxHeight;
 
-                      const rw = imgNat.w * s;
-                      const rh = imgNat.h * s;
+                        const baseScaleNow = Math.max(Cw / imgNat.w, Ch / imgNat.h);
+                        const s = baseScaleNow * cropZoom;
 
-                      const left = (Cw - rw) / 2 + cropOffset.x;
-                      const top = (Ch - rh) / 2 + cropOffset.y;
+                        const rw = imgNat.w * s;
+                        const rh = imgNat.h * s;
 
-                      let sx = (0 - left) / s;
-                      let sy = (0 - top) / s;
-                      let sw = Cw / s;
-                      let sh = Ch / s;
+                        const left = (Cw - rw) / 2 + cropOffset.x;
+                        const top = (Ch - rh) / 2 + cropOffset.y;
 
-                      sx = Math.max(0, Math.min(imgNat.w - sw, sx));
-                      sy = Math.max(0, Math.min(imgNat.h - sh, sy));
+                        let sx = (0 - left) / s;
+                        let sy = (0 - top) / s;
+                        let sw = Cw / s;
+                        let sh = Ch / s;
 
-                      const outW = 840;
-                      const outH = 570;
-                      const canvas = document.createElement("canvas");
-                      canvas.width = outW;
-                      canvas.height = outH;
+                        sx = Math.max(0, Math.min(imgNat.w - sw, sx));
+                        sy = Math.max(0, Math.min(imgNat.h - sh, sy));
 
-                      const ctx = canvas.getContext("2d")!;
-                      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, outW, outH);
+                        const outW = 840;
+                        const outH = 570;
+                        const canvas = document.createElement("canvas");
+                        canvas.width = outW;
+                        canvas.height = outH;
 
-                      const blob: Blob = await new Promise((resolve) =>
-                        canvas.toBlob((b) => resolve(b!), "image/png", 0.92)
-                      );
+                        const ctx = canvas.getContext("2d")!;
+                        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, outW, outH);
 
-                      const nextUrl = URL.createObjectURL(blob);
+                        const blob: Blob = await new Promise((resolve, reject) =>
+                          canvas.toBlob((b) => {
+                            if (!b) {
+                              reject(new Error("Failed to create image blob"));
+                              return;
+                            }
+                            resolve(b);
+                          }, "image/png", 0.92)
+                        );
 
-                      setPhotoUrl((prev) => {
-                        if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
-                        return nextUrl;
-                      });
-
-                      closeCropModal();
+                        await uploadAndSaveProfilePhoto(blob);
+                        closeCropModal();
+                      } catch (e: any) {
+                        alert(e?.message || "Failed to save profile photo");
+                      } finally {
+                        setPhotoSaving(false);
+                      }
                     }}
                   >
-                    Save
+                    {photoSaving ? "Saving..." : "Save"}
                   </button>
                 </div>
               </div>
@@ -413,7 +1065,6 @@ export default function ClientDashboard() {
         </div>
       </div>
     </div>
-
   );
 }
 
@@ -476,10 +1127,7 @@ function TopProfileRow({
 
         <div className={styles.bioInformation}>
           <div className={styles.profileName}>{me.name}</div>
-
-          <div className={styles.profileBio}>
-            {me.bio}
-          </div>
+          <div className={styles.profileBio}>{me.bio}</div>
 
           <div className={styles.linesWrap}>
             <div className={styles.lineTop} />
@@ -488,21 +1136,10 @@ function TopProfileRow({
             <div className={styles.lineVertical} />
           </div>
 
-          <div className={styles.profilePhone}>
-            Phone: {me.phone}
-          </div>
-
-          <div className={styles.profileEmail}>
-            Email: {me.email}
-          </div>
-
-          <div className={styles.profileAddress}>
-            Address: {me.address}
-          </div>
-
-          <div className={styles.profileEducation}>
-            Education: {me.education}
-          </div>
+          <div className={styles.profilePhone}>Phone: {me.phone}</div>
+          <div className={styles.profileEmail}>Email: {me.email}</div>
+          <div className={styles.profileAddress}>Address: {me.address}</div>
+          <div className={styles.profileEducation}>Education: {me.education}</div>
         </div>
       </section>
     </div>
@@ -519,7 +1156,7 @@ function MidRow({
   skills: Skill[];
   onClickTile: (id: TileId) => void;
 }) {
-  const badgeThresholds = [5, 6, 10, 20, 35];
+  const badgeThresholds = [3, 6, 7, 8, 10];
   const filledMedals = badgeThresholds.filter((lv) => me.level >= lv).length;
   const currentBadgeIndex =
     filledMedals > 0 ? Math.min(filledMedals - 1, LEVEL_BADGES.length - 1) : -1;
@@ -551,7 +1188,6 @@ function MidRow({
               aria-hidden="true"
               className={styles.levelBadgeIcon}
             />
-
           </div>
         </div>
 
@@ -600,7 +1236,6 @@ function MidRow({
             </button>
           ))}
         </div>
-
       </section>
 
       <section className={cx(styles.card, styles.skillCard)}>
@@ -615,37 +1250,40 @@ function MidRow({
             aria-label="Skill progress list"
           >
             <div className={styles.skillRow}>
-              {skills.map((s, i) => (
-                <div key={s.id} className={styles.skillCol}>
-                  <div className={styles.skillPct}>{s.percent}%</div>
+              {skills.length > 0 ? (
+                skills.map((s, i) => (
+                  <div key={s.id} className={styles.skillCol}>
+                    <div className={styles.skillPct}>{s.percent}%</div>
 
-                  <div className={styles.skillTube}>
-                    <div
-                      className={cx(
-                        styles.skillFill,
-                        i === 0 && styles.trackGreenWide,
-                        i === 1 && styles.trackPink,
-                        i === 2 && styles.trackYellow,
-                        i === 3 && styles.trackGreen,
-                        i === 4 && styles.trackSoftPink,
-                        i === 5 && styles.trackBlue,
-                        i === 6 && styles.trackOrange,
-                        i === 7 && styles.trackRose,
-                        i === 8 && styles.trackSoftPink,
-                        i === 9 && styles.trackBlue,
-                        i === 10 && styles.trackOrange,
-                        i === 11 && styles.trackRose
-                      )}
-                      style={{ height: `${s.percent}%` }}
-                    />
+                    <div className={styles.skillTube}>
+                      <div
+                        className={cx(
+                          styles.skillFill,
+                          i === 0 && styles.trackGreenWide,
+                          i === 1 && styles.trackPink,
+                          i === 2 && styles.trackYellow,
+                          i === 3 && styles.trackGreen,
+                          i === 4 && styles.trackSoftPink,
+                          i === 5 && styles.trackBlue,
+                          i === 6 && styles.trackOrange,
+                          i === 7 && styles.trackRose,
+                          i === 8 && styles.trackSoftPink,
+                          i === 9 && styles.trackBlue,
+                          i === 10 && styles.trackOrange,
+                          i === 11 && styles.trackRose
+                        )}
+                        style={{ height: `${s.percent}%` }}
+                      />
+                    </div>
 
+                    <div className={styles.skillLabel} title={s.name}>
+                      {s.name}
+                    </div>
                   </div>
-
-                  <div className={styles.skillLabel} title={s.name}>
-                    {s.name}
-                  </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <div style={{ padding: 16 }}>No skills</div>
+              )}
             </div>
           </div>
         </div>
@@ -654,8 +1292,13 @@ function MidRow({
   );
 }
 
-/*  Split card: Activity | Mission (Figma structure) */
-function ActivityMissionSplit() {
+function ActivityMissionSplit({
+  activities,
+  missions,
+}: {
+  activities: ActivityItem[];
+  missions: MissionItem[];
+}) {
   return (
     <section className={cx(styles.card, styles.splitCard)}>
       <div className={styles.splitCardBg} />
@@ -681,132 +1324,63 @@ function ActivityMissionSplit() {
 
         <div className={styles.activityScrollArea}>
           <div className={styles.activityRow}>
-            {ACTIVITIES.map((a) => (
-              <button key={a.id} type="button" className={styles.activityCard}>
-                <div className={styles.activityCardBg} />
+            {activities.length > 0 ? (
+              activities.map((a) => (
+                <button key={a.id} type="button" className={styles.activityCard}>
+                  <div className={styles.activityCardBg} />
 
-                <div className={styles.activityCardText}>
-                  <div className={styles.activityCardTitle}>{a.title}</div>
-                  <div className={styles.activityCardSub}>{a.sub}</div>
-                </div>
+                  <div className={styles.activityCardText}>
+                    <div className={styles.activityCardTitle}>{a.title}</div>
+                    <div className={styles.activityCardSub}>{a.sub}</div>
+                  </div>
 
-                <div className={styles.activityRewardIcon} aria-hidden>
-                  ⭐
-                </div>
+                  <div className={styles.activityRewardIcon} aria-hidden>⭐</div>
 
-                <div className={styles.activityRewardText}>{a.xp} XP</div>
-              </button>
-            ))}
-
-            {ACTIVITIES.map((a) => (
-              <button key={`${a.id}-copy`} type="button" className={styles.activityCard}>
-                <div className={styles.activityCardBg} />
-
-                <div className={styles.activityCardText}>
-                  <div className={styles.activityCardTitle}>{a.title}</div>
-                  <div className={styles.activityCardSub}>{a.sub}</div>
-                </div>
-
-                <div className={styles.activityRewardIcon} aria-hidden>
-                  ⭐
-                </div>
-
-                <div className={styles.activityRewardText}>{a.xp} XP</div>
-              </button>
-            ))}
+                  <div className={styles.activityRewardText}>{a.xp} XP</div>
+                </button>
+              ))
+            ) : (
+              <div style={{ padding: 16 }}>No activities</div>
+            )}
           </div>
         </div>
-
       </div>
 
       <div className={styles.missionPane}>
         <div className={styles.missionPaneTitle}>Today&apos;s mission</div>
 
         <div className={styles.missionPaneList}>
-          <div className={styles.missionPaneItem}>
-            <div className={styles.missionPaneText}>Join 2 activities</div>
-            <div className={styles.missionPaneXp}>10 XP</div>
-          </div>
-
-          <div className={styles.missionPaneItem}>
-            <div className={styles.missionPaneText}>Complete one activity</div>
-            <div className={styles.missionPaneXp}>10 XP</div>
-          </div>
-
-          <div className={styles.missionPaneItem}>
-            <div className={styles.missionPaneText}>Join activity in 15 minutes</div>
-            <div className={styles.missionPaneXp}>10 XP</div>
-          </div>
+          {missions.length > 0 ? (
+            missions.map((mission) => (
+              <div key={mission.id} className={styles.missionPaneItem}>
+                <div className={styles.missionPaneText}>{mission.title}</div>
+                <div className={styles.missionPaneXp}>
+                  {shortDateTime(mission.startAt)}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div style={{ padding: 12 }}>No missions</div>
+          )}
         </div>
       </div>
     </section>
   );
 }
 
-/* Split card: Completion | XP chart (Figma structure) */
-function BottomSplit() {
+function BottomSplit({
+  completionSegments,
+  dailyBars,
+  weeklyBars,
+}: {
+  completionSegments: CompletionSegment[];
+  dailyBars: Array<{ labelTop: string; labelBottom: string; xp: number }>;
+  weeklyBars: Array<{ labelTop: string; labelBottom: string; xp: number }>;
+}) {
   const [period, setPeriod] = useState<"daily" | "weekly">("daily");
-  const [selectedSegment, setSelectedSegment] = useState<
-    "completed" | "inProgress" | "registered" | "incomplete" | null
-  >(null);
+  const [selectedSegment, setSelectedSegment] = useState<ActivityStatusKey | null>(null);
 
-  const completionSegments = {
-    completed: {
-      key: "completed" as const,
-      title: "Completed",
-      count: 3,
-      color: "#9FD5A8",
-      colorClass: styles.badgeFillGreen,
-      items: [
-        "Frontend Basics & Web Terminology",
-        "UI Layout Explanation Task",
-        "Responsive Web Page Workshop",
-      ],
-    },
-    inProgress: {
-      key: "inProgress" as const,
-      title: "In Progress",
-      count: 10,
-      color: "#F1C97B",
-      colorClass: styles.badgeFillYellowSoft,
-      items: [
-        "Typography Practice Challenge",
-        "Color Theory Basics",
-        "Landing Page Wireframe",
-        "Accessibility Intro Task",
-        "Component Naming Exercise",
-        "Responsive Grid Exercise",
-        "Portfolio Content Draft",
-        "Navbar Interaction Practice",
-        "Button Variant Design",
-        "Card Layout Refinement",
-      ],
-    },
-    registered: {
-      key: "registered" as const,
-      title: "Registered",
-      count: 1,
-      color: "#7EC6D9",
-      colorClass: styles.badgeFillBlue,
-      items: ["Advanced Prototype Session"],
-    },
-    incomplete: {
-      key: "incomplete" as const,
-      title: "Incomplete",
-      count: 1,
-      color: "#E58F82",
-      colorClass: styles.badgeFillRed,
-      items: ["JavaScript Fundamentals Quiz"],
-    },
-  } as const;
-
-  const segmentOrder = [
-    completionSegments.completed,
-    completionSegments.incomplete,
-    completionSegments.registered,
-    completionSegments.inProgress,
-  ];
-
+  const segmentOrder = completionSegments;
   const totalActivities = segmentOrder.reduce((sum, seg) => sum + seg.count, 0);
 
   const allItems = segmentOrder.flatMap((seg) =>
@@ -817,7 +1391,10 @@ function BottomSplit() {
     }))
   );
 
-  const currentInfo = selectedSegment ? completionSegments[selectedSegment] : null;
+  const currentInfo = selectedSegment
+    ? segmentOrder.find((x) => x.key === selectedSegment) ?? null
+    : null;
+
   const rightItems = currentInfo
     ? currentInfo.items.map((item) => ({
       item,
@@ -826,36 +1403,7 @@ function BottomSplit() {
     }))
     : allItems;
 
-  const dailyBars = [
-    { labelTop: "SUN", labelBottom: "04/01/2026", xp: 20 },
-    { labelTop: "MON", labelBottom: "05/02/2026", xp: 25 },
-    { labelTop: "TUE", labelBottom: "06/02/2026", xp: 15 },
-    { labelTop: "WED", labelBottom: "07/02/2026", xp: 23 },
-    { labelTop: "THU", labelBottom: "08/02/2026", xp: 12 },
-    { labelTop: "FRI", labelBottom: "09/02/2026", xp: 25 },
-    { labelTop: "SAT", labelBottom: "10/02/2026", xp: 30 },
-    { labelTop: "SUN", labelBottom: "11/02/2026", xp: 18 },
-    { labelTop: "MON", labelBottom: "12/02/2026", xp: 32 },
-  ];
-
-  const weeklyBars = [
-    { labelTop: "week1", labelBottom: "04/01/26-10/01/26", xp: 175 },
-    { labelTop: "week2", labelBottom: "11/01/26-17/01/26", xp: 90 },
-    { labelTop: "week3", labelBottom: "18/01/26-24/01/26", xp: 150 },
-    { labelTop: "week4", labelBottom: "25/01/26-31/01/26", xp: 110 },
-    { labelTop: "week5", labelBottom: "01/02/26-07/02/26", xp: 185 },
-    { labelTop: "week6", labelBottom: "08/02/26-14/02/26", xp: 140 },
-  ];
-
   const barsRaw = period === "daily" ? dailyBars : weeklyBars;
-  const maxXp = Math.max(...barsRaw.map((b) => b.xp), 1);
-  const chartMaxHeight = period === "daily" ? 126 : 138;
-
-  const bars = barsRaw.map((b) => ({
-    ...b,
-    h: Math.max(32, Math.round((b.xp / maxXp) * chartMaxHeight)),
-  }));
-
   const size = 210;
   const center = size / 2;
   const radius = 56;
@@ -864,39 +1412,42 @@ function BottomSplit() {
 
   let accumulated = 0;
 
-  const donutSegments = segmentOrder.map((seg) => {
-    const fraction = seg.count / totalActivities;
-    const arc = circumference * fraction;
-    const startFraction = accumulated;
-    const midFraction = startFraction + fraction / 2;
-    accumulated += fraction;
+  const donutSegments =
+    totalActivities > 0
+      ? segmentOrder.map((seg) => {
+        const fraction = seg.count / totalActivities;
+        const arc = circumference * fraction;
+        const startFraction = accumulated;
+        const midFraction = startFraction + fraction / 2;
+        accumulated += fraction;
 
-    const angle = midFraction * Math.PI * 2 - Math.PI / 2;
-    const isActive = selectedSegment === seg.key;
+        const angle = midFraction * Math.PI * 2 - Math.PI / 2;
+        const isActive = selectedSegment === seg.key;
 
-    const popDistance = isActive ? 3 : 0;
-    const offsetX = isActive ? Math.cos(angle) * popDistance : 0;
-    const offsetY = isActive ? Math.sin(angle) * popDistance : 0;
+        const popDistance = isActive ? 3 : 0;
+        const offsetX = isActive ? Math.cos(angle) * popDistance : 0;
+        const offsetY = isActive ? Math.sin(angle) * popDistance : 0;
 
-    const labelRadius =
-      seg.key === "inProgress"
-        ? radius - strokeWidth / 2 + 2
-        : radius - strokeWidth / 2 + 8;
+        const labelRadius =
+          seg.key === "inProgress"
+            ? radius - strokeWidth / 2 + 2
+            : radius - strokeWidth / 2 + 8;
 
-    const labelX = center + Math.cos(angle) * labelRadius;
-    const labelY = center + Math.sin(angle) * labelRadius;
+        const labelX = center + Math.cos(angle) * labelRadius;
+        const labelY = center + Math.sin(angle) * labelRadius;
 
-    return {
-      ...seg,
-      arc,
-      dashOffset: -startFraction * circumference,
-      offsetX,
-      offsetY,
-      labelX,
-      labelY,
-      isActive,
-    };
-  });
+        return {
+          ...seg,
+          arc,
+          dashOffset: -startFraction * circumference,
+          offsetX,
+          offsetY,
+          labelX,
+          labelY,
+          isActive,
+        };
+      })
+      : [];
 
   const yTicks = period === "daily" ? [0, 10, 20, 30, 40] : [0, 50, 100, 150, 200];
   const chartMaxValue = yTicks[yTicks.length - 1];
@@ -904,12 +1455,15 @@ function BottomSplit() {
 
   const barsForRender = barsRaw.map((b) => ({
     ...b,
-    h: Math.max(22, Math.round((b.xp / chartMaxValue) * chartDrawableHeight)),
+    h:
+      b.xp <= 0
+        ? 12
+        : Math.max(22, Math.round((b.xp / chartMaxValue) * chartDrawableHeight)),
   }));
 
   const itemWidth = period === "daily" ? 60 : 82;
   const itemGap = period === "daily" ? 8 : 12;
-  const plotWidth = barsForRender.length * itemWidth + (barsForRender.length - 1) * itemGap;
+  const plotWidth = barsForRender.length * itemWidth + Math.max(0, barsForRender.length - 1) * itemGap;
 
   return (
     <section className={cx(styles.card, styles.splitCardBottom)}>
@@ -1019,8 +1573,6 @@ function BottomSplit() {
                 >
                   {totalActivities}
                 </text>
-
-
               </svg>
             </div>
 
@@ -1067,11 +1619,15 @@ function BottomSplit() {
             </div>
 
             <div className={styles.completionInfoListScrollable}>
-              {rightItems.map((entry, idx) => (
-                <div key={`${entry.sectionTitle}-${entry.item}-${idx}`} className={styles.completionInfoItem}>
-                  - {entry.item}
-                </div>
-              ))}
+              {rightItems.length > 0 ? (
+                rightItems.map((entry, idx) => (
+                  <div key={`${entry.sectionTitle}-${entry.item}-${idx}`} className={styles.completionInfoItem}>
+                    - {entry.item}
+                  </div>
+                ))
+              ) : (
+                <div className={styles.completionInfoItem}>- No data</div>
+              )}
             </div>
           </div>
         </div>
@@ -1132,7 +1688,7 @@ function BottomSplit() {
                   ))}
               </div>
 
-              <div className={styles.barPlotArea} style={{ width: `${plotWidth}px` }}>
+              <div className={styles.barPlotArea} style={{ width: `${Math.max(plotWidth, 320)}px` }}>
                 {yTicks
                   .slice(1)
                   .reverse()
@@ -1182,26 +1738,56 @@ function AvatarCard({
   selected,
   onSelect,
   avatarChoices,
+  saving = false,
 }: {
   selected: number;
   onSelect: (idx: number) => void;
-  avatarChoices: string[];
+  avatarChoices: AvatarOption[];
+  saving?: boolean;
 }) {
+  const currentAvatar = avatarChoices[selected] ?? null;
+
   return (
     <section className={cx(styles.card, styles.avatarCard)}>
       <div className={styles.avatarBig}>
-        <div className={styles.avatarStub} />
+        {currentAvatar?.modelUrl ? (
+          <div className={styles.avatarBigStage}>
+            <Avatar3D
+              modelUrl={currentAvatar.modelUrl}
+              className={styles.avatarViewport}
+              modelScale={1.5}
+              modelPosition={[0, -0.7, 0]}
+              cameraPosition={[0.5, 0.02, 2.5]}
+              cameraFov={38}
+            />
+          </div>
+        ) : (
+          <div className={styles.avatarEmpty}>No avatar</div>
+        )}
       </div>
 
       <div className={styles.avatarThumbRow}>
-        {avatarChoices.map((src, idx) => (
+        {avatarChoices.map((avatar, idx) => (
           <button
-            key={src}
+            key={avatar.id}
             type="button"
             className={cx(styles.avatarThumbCard, idx === selected && styles.avatarThumbCardOn)}
             onClick={() => onSelect(idx)}
+            disabled={saving}
+            aria-label={`Select ${avatar.name}`}
+            aria-pressed={idx === selected}
           >
-            <div className={styles.avatarThumbImg} />
+            <div className={styles.avatarThumbImg}>
+              <Avatar3D
+                modelUrl={avatar.modelUrl}
+                className={styles.avatarViewport}
+                modelScale={1.1}
+                modelPosition={[0, -0.55, 0]}
+                cameraPosition={[0, 0.05, 2.2]}
+                cameraFov={34}
+              />
+            </div>
+
             <div className={styles.avatarCheck}>
               <span className={cx(styles.checkBox, idx === selected && styles.checkBoxOn)}>
                 {idx === selected ? "✓" : ""}
@@ -1210,6 +1796,7 @@ function AvatarCard({
           </button>
         ))}
       </div>
+      {/* {saving && <div className={styles.avatarSavingText}>Saving avatar...</div>} */}
     </section>
   );
 }
@@ -1232,7 +1819,13 @@ type CalendarDayItem = {
   events: CalendarEvent[];
 };
 
-function CalendarCard({ title }: { title: string }) {
+function CalendarCard({
+  title,
+  schedules,
+}: {
+  title: string;
+  schedules: ScheduleItem[];
+}) {
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   const weeks: CalendarDayItem[][] = [
@@ -1354,15 +1947,22 @@ function CalendarCard({ title }: { title: string }) {
               ))}
             </div>
           ))}
+
+          {schedules.length > 0 && (
+            <div style={{ padding: "10px 6px 0 6px", fontSize: 12 }}>
+              {schedules.slice(0, 3).map((item) => (
+                <div key={item.id} style={{ marginBottom: 6 }}>
+                  {item.title} • {shortDateTime(item.startAt)}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </section>
   );
 }
 
-/* =======================
-   Modal Components
-======================= */
 function ModalShell({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
     <div className={styles.modalOverlay} role="dialog" aria-modal="true" onMouseDown={onClose}>

@@ -1,8 +1,8 @@
 import OrgSidebar from "@/components/shared/organization/OrgSidebar";
 import { ORGANIZATION_SIDEBAR_ITEMS } from "@/lib/config/organization/routes";
-// import OrgDashboard from "./OrgDashboard";
+import ActivityMeeting from "./ActivityMeeting";
 
-export default function OrgExplorePage() {
+export default function ActivityMeetingPage() {
   return (
     <div style={{ background: "#F3EEE8", minHeight: "100vh", padding: 18, boxSizing: "border-box" }}>
       <div
@@ -30,10 +30,9 @@ export default function OrgExplorePage() {
           }}
         >
           <div style={{ width: 1380 }}>
-            {/* <OrgDashboard/> */}
+            <ActivityMeeting/>
           </div>
         </main>
-
       </div>
     </div>
   );

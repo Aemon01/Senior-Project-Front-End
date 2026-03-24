@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import * as THREE from "three";
@@ -28,6 +28,20 @@ import { angleDiff, nearestRoadPointToBuilding, samplePointOnMesh } from "../uti
 import type { NavItem } from "@/lib/config/student/routes";
 import { STUDENT_SIDEBAR_ITEMS } from "@/lib/config/student/routes";
 
+type CurrentStudent = {
+  user_id: string;
+  std_id: string;
+  first_name: string;
+  last_name: string;
+  level: number;
+  xp: number;
+  xp_max: number;
+  avatar_choice: string | null;
+  profile_image_url: string | null;
+  avatar_model_url: string | null;
+  avatar_image_url: string | null;
+};
+
 export default function ExploreScene() {
   const router = useRouter();
   const { companies } = useCompanies();
@@ -35,7 +49,7 @@ export default function ExploreScene() {
 
   const resolveCompany = useCallback(
     (meshName: string) => resolveCompanyByMeshName(meshName, companyIndex),
-    [companyIndex, resolveCompanyByMeshName]
+    [companyIndex]
   );
 
   const roadsRef = useRef<THREE.Mesh[]>([]);
@@ -47,13 +61,50 @@ export default function ExploreScene() {
 
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [hoverBuilding, setHoverBuilding] = useState<HoverBuildingPayload>(null);
-  const userName = "Carolyn";
+
+  const [me, setMe] = useState<CurrentStudent | null>(null);
 
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const camAnimRef = useRef<CamAnimState | null>(null);
   const yawAnimRef = useRef<YawAnimState | null>(null);
   const isAnimatingRef = useRef(false);
+
+  useEffect(() => {
+  let cancelled = false;
+
+  (async () => {
+    try {
+      const r = await fetch("/api/student", { cache: "no-store" });
+      const json = await r.json().catch(() => null);
+
+      if (!r.ok || !json?.ok) return;
+
+      const s = json?.data?.student_info;
+      if (!s) return;
+
+      if (!cancelled) {
+        setMe({
+          user_id: s.user_id ?? "",
+          std_id: s.std_id ?? "",
+          first_name: s.first_name ?? "",
+          last_name: s.last_name ?? "",
+          level: Number(s.level ?? 1),
+          xp: 0,
+          xp_max: Number(s.xp_max ?? 100),
+          avatar_choice: s.avatar_choice ?? null,
+          profile_image_url: s.profile_image_url ?? null,
+          avatar_model_url: s.avatar_model_url ?? null,
+          avatar_image_url: s.avatar_image_url ?? null,
+        });
+      }
+    } catch {}
+  })();
+
+  return () => {
+    cancelled = true;
+  };
+}, []);
 
   const handleRoadsOnce = useCallback((roads: THREE.Mesh[]) => {
     roadsRef.current = roads;
@@ -68,7 +119,7 @@ export default function ExploreScene() {
     p.y += FOOT_Y_OFFSET;
     avatarPosRef.current.copy(p);
     setAvatarPosState(p.clone());
-  }, [FOOT_Y_OFFSET, samplePointOnMesh]);
+  }, [samplePointOnMesh]);
 
   const handlePickRoad = useCallback((p: THREE.Vector3) => {
     camAnimRef.current = null;
@@ -77,7 +128,7 @@ export default function ExploreScene() {
     pp.y += FOOT_Y_OFFSET;
     avatarPosRef.current.copy(pp);
     setAvatarPosState(pp);
-  }, [FOOT_Y_OFFSET]);
+  }, []);
 
   const flyTo = useCallback(
     (target: THREE.Vector3, dist: number, pendingCompany: Company | null) => {
@@ -118,15 +169,7 @@ export default function ExploreScene() {
 
       setSelectedCompany(null);
     },
-    [
-      CAMERA_PITCH,
-      CAMERA_YAW_A,
-      CAMERA_YAW_B,
-      CAMERA_YAW_RANGE,
-      FLY_DURATION_MS,
-      angleDiff,
-      setSelectedCompany,
-    ]
+    []
   );
 
   const toggleView = useCallback(() => {
@@ -157,7 +200,7 @@ export default function ExploreScene() {
       range: CAMERA_YAW_RANGE,
       prevEnableDamping,
     };
-  }, [CAMERA_PITCH, CAMERA_YAW_A, CAMERA_YAW_B, CAMERA_YAW_RANGE, angleDiff]);
+  }, []);
 
   const handlePickBuilding = useCallback(
     (payload: { meshName: string; worldPos: THREE.Vector3; company: Company | null }) => {
@@ -176,20 +219,13 @@ export default function ExploreScene() {
       target.y += BUILDING_FOCUS_Y;
       flyTo(target, BUILDING_FOCUS_DIST, company);
     },
-    [
-      BUILDING_FOCUS_DIST,
-      BUILDING_FOCUS_Y,
-      FOOT_Y_OFFSET,
-      buildFallbackCompany,
-      flyTo,
-      nearestRoadPointToBuilding,
-    ]
+    [flyTo]
   );
 
   const focusOnAvatar = useCallback(() => {
     const target = avatarPosRef.current.clone();
     flyTo(target, AVATAR_FOCUS_DIST, null);
-  }, [AVATAR_FOCUS_DIST, flyTo]);
+  }, [flyTo]);
 
   const handleNavItem = useCallback(
     (item: NavItem) => {
@@ -216,7 +252,11 @@ export default function ExploreScene() {
         onFocusAvatar={focusOnAvatar}
         onNavigate={handleNavItem}
         navItems={STUDENT_SIDEBAR_ITEMS}
-        userName={userName}
+        userName={me?.first_name || ""}
+        level={me?.level ?? 1}
+        xpCurrent={me?.xp ?? 0}
+        xpMax={me?.xp_max ?? 100}
+        avatarModelUrl={me?.avatar_model_url || ""}
       />
 
       <MapCanvas
@@ -227,7 +267,8 @@ export default function ExploreScene() {
         isAnimatingRef={isAnimatingRef}
         avatarRef={avatarRef}
         avatarPos={avatarPosState}
-        userName={userName}
+        userName={me?.first_name || ""}
+        avatarModelUrl={me?.avatar_model_url || ""}
         hoverBuilding={hoverBuilding}
         onRoadMeshesOnce={handleRoadsOnce}
         onPickRoadPoint={handlePickRoad}

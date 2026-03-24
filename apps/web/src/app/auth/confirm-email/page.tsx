@@ -132,7 +132,6 @@ export default function ConfirmEmailPage() {
   const onConfirm = async () => {
     if (!email || loading) return;
 
-    // lock confirm when expired
     if (isExpired) {
       setIsError(true);
       setMsg("Code expired. Please send again.");
@@ -152,17 +151,28 @@ export default function ConfirmEmailPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, code }),
       });
+
       const data = await r.json().catch(() => ({}));
 
       if (!r.ok) {
         setIsError(true);
-        if (data?.code === "EXPIRED_CODE") setMsg("Code expired. Please send again.");
-        else setMsg("Invalid code. Please try again.");
+
+        if (data?.code === "EXPIRED_CODE") {
+          setMsg("Code expired. Please send again.");
+        } else if (data?.code === "CODE_MISMATCH") {
+          setMsg("Invalid code. Please try again.");
+        } else if (data?.code === "BACKEND_FIND_USER_FAILED") {
+          setMsg(data?.detail || "Backend could not find this user.");
+        } else if (data?.code === "BACKEND_CONFIRM_UPDATE_FAILED") {
+          setMsg(data?.detail || "Backend could not update this user.");
+        } else {
+          setMsg(data?.message || "Confirm failed.");
+        }
+
         resetOtp();
         return;
       }
 
-      // หลัง if (!r.ok) ผ่านแล้ว (confirm สำเร็จ)
       const role = data?.role as "student" | "employee" | undefined;
 
       const next =

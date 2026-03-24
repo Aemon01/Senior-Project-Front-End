@@ -1,0 +1,1998 @@
+:root{
+  --bg: #f3eee8;
+  --stroke: #e0d6cd;
+  --shadow: 0 16px 26px rgba(0, 0, 0, 0.08);
+}
+
+.page{
+  min-height: 100dvh;
+  background: var(--bg);
+  padding: 18px;
+  box-sizing: border-box;
+
+  display: grid;
+  grid-template-columns: 96px 1fr; /* sidebar + content */
+  gap: 24px;
+}
+
+.sidebarWrap{
+  position: sticky;
+  top: 18px;
+  height: calc(100dvh - 36px);
+}
+
+.main{
+  min-width: 0;
+}
+
+/* ===== top grid ===== */
+.topGrid{
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(200px, 0.4fr) minmax(280px, 0.7fr);
+  grid-template-areas:
+    "org summary avatar"
+    "summaryActivities summaryActivities avatar";
+  gap: 18px;
+  align-items: start;
+}
+
+/* org profile */
+/* org profile card - figma-like but keep current size */
+.orgCard{
+  grid-area: org;
+  position: relative;
+  height: 200px;
+}
+
+.orgCardBg{
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  border: 1px solid #efefef;
+  background: #fefefe;
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
+}
+
+.orgCardContent{
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  column-gap: 18px;
+  padding: 18px 18px 12px 16px;
+  box-sizing: border-box;
+}
+
+.orgLogoBox{
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 1px;
+}
+
+.orgLogoCircle{
+  width: 85px;
+  height: 85px;
+  border-radius: 999px;
+  border: 2px solid rgba(0,0,0,0.58);
+  background: #fff;
+  position: relative;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+}
+
+.orgLogoMark{
+  width: 62px;
+  height: 62px;
+  border-radius: 999px;
+  position: relative;
+  transform: rotate(-8deg);
+  background:
+    repeating-conic-gradient(
+      #ffa589 0deg 18deg,
+      transparent 18deg 45deg
+    );
+}
+
+.orgLogoMark::before{
+  content: "";
+  position: absolute;
+  inset: 22px;
+  border-radius: 999px;
+  background: #fff;
+}
+
+.orgInfoWrap{
+  min-width: 0;
+  position: relative;
+  padding-right: 54px;
+}
+
+.orgName{
+  margin: 0;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1;
+  color: #000;
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+}
+
+.orgDesc{
+  margin: 12px 0 16px;
+  min-height: 58px;
+  font-size: 14px;
+  line-height: 1.34;
+  color: rgba(0,0,0,0.82);
+  font-family: Inter, Arial, sans-serif;
+
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.orgMetaGrid{
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  grid-template-rows: 13px 13px;
+  column-gap: 18px;
+  row-gap: 2px;
+
+  font-size: 12px;
+  line-height: 1;
+  color: #000;
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+  align-items: center;
+}
+
+.orgPhone{
+  grid-column: 1;
+  grid-row: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.orgEmail{
+  grid-column: 1;
+  grid-row: 2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.orgAddress{
+  grid-column: 2;
+  grid-row: 2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.orgEditBtn{
+  position: absolute;
+  top: 17px;
+  right: 16px;
+  z-index: 2;
+
+  width: 34px;
+  height: 28px;
+  /* border-radius: 4px;
+  border: 1.4px solid rgba(0,0,0,0.32);
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08); */
+  cursor: pointer;
+
+  display: block;
+  padding: 2px;
+  overflow: hidden;
+}
+
+.orgEditBtn:hover{
+  background: #fafafa;
+}
+
+.orgEditIcon{
+  font-size: 15px;
+  line-height: 1;
+  color: #000;
+  transform: translateY(-0.5px);
+}
+
+/* summary card */
+.summaryCard{
+  grid-area: summary;
+  position: relative;
+  width: 100%;
+  height: 200px; /* ให้ใกล้ขนาดเดิมใน layout ปัจจุบัน */
+  box-sizing: border-box;
+}
+
+.summaryCardBg{
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  border: 1px solid #efefef;
+  background: #fefefe;
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.10);
+  box-sizing: border-box;
+}
+
+.summaryTopBox{
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  height: 120px;
+  box-sizing: border-box;
+
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: 44px 18px 24px;
+  align-items: center;
+  justify-items: center;
+  padding: 10px 14px 8px;
+}
+
+.summaryTopBoxBg{
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  border: 0.5px solid #efefef;
+  background: #fefefe;
+  box-shadow: 2px 2px 4px #f7f7f7;
+  box-sizing: border-box;
+  z-index: 0;
+}
+
+.summaryTotalValue{
+  position: relative;
+  z-index: 1;
+  grid-column: 1 / span 3;
+  grid-row: 1;
+  font-size: 34px;
+  line-height: 1;
+  font-weight: 500;
+  color: #000;
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+  margin-top: 2px;
+}
+
+.summaryTotalLabel{
+  position: relative;
+  z-index: 1;
+  grid-column: 1 / span 3;
+  grid-row: 2;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 300;
+  color: rgba(0,0,0,0.72);
+  text-align: center;
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+}
+
+.summaryMiniStat{
+  position: relative;
+  z-index: 1;
+  grid-row: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  min-width: 0;
+  width: 100%;
+}
+
+.summaryMiniLabel{
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 300;
+  color: rgba(0,0,0,0.72);
+  text-align: center;
+  white-space: nowrap;
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+  margin-top: 25px;
+}
+
+.summaryMiniValue{
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 400;
+  color: #000;
+  text-align: center;
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+}
+
+.summaryBottom{
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  height: 54px;
+
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  align-items: center;
+  column-gap: 8px;
+}
+
+.summaryParticipantIconWrap{
+  width: 50px;
+  height: 50px;
+  display: grid;
+  place-items: center;
+}
+
+.summaryParticipantIcon{
+  width: 50px;
+  height: 50px;
+  object-fit: contain;
+  display: block;
+}
+
+.summaryParticipantText{
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.summaryParticipantValue{
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 500;
+  color: #000;
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+}
+
+.summaryParticipantLabel{
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.1;
+  font-weight: 300;
+  color: rgba(0,0,0,0.72);
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+}
+
+.hr{
+  height: 1px;
+  background: rgba(0,0,0,0.15);
+  margin: 10px 0;
+}
+
+/* avatar box (ขวาบน) */
+.avatarBox{
+  grid-area: avatar;
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.buildingWrap{
+  height: 250px;
+  background: #f7f7f7;
+  display: grid;
+  place-items: center;
+  border-bottom: 1px solid rgba(0,0,0,0.10);
+}
+
+.buildingImg{
+  width: 90%;
+  max-width: 280px;
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 14px 12px rgba(0,0,0,0.12));
+}
+
+.avatarRow{
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  align-items: flex-end;
+}
+
+.avatarTile{
+  border: 1px solid rgba(0,0,0,0.15);
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  padding: 10px 8px;
+}
+
+.avatarThumb{
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto 6px;
+  filter: grayscale(0.25) brightness(0.95);
+  opacity: 0.70; /* default = จาง */
+}
+
+.avatarThumbActive{
+  opacity: 1;                 /* ✅ active = เข้ม */
+  filter: grayscale(0) brightness(1);
+}
+
+.avatarName{
+  text-align: center;
+  font-size: 11px;
+  color: rgba(0,0,0,0.7);
+}
+
+.addEmpBtn{
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  border: 2px solid rgba(0,0,0,0.20);
+  background: #fff;
+  cursor: pointer;
+  font-size: 26px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+}
+
+
+
+/* ===== summary of activities row (figma-like) ===== */
+.summaryOfActivities{
+  grid-area: summaryActivities;
+  position: relative;
+  width: 100%;
+  height: 150px;
+  min-width: 0;
+}
+
+.summaryOfActivitiesBg{
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  background: #fefefe;
+  border: 1px solid #efefef;
+  box-sizing: border-box;
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.10);
+}
+
+.summaryOfActivitiesInner{
+  position: absolute;
+  top: 10px;
+  left: 26px;
+  right: 26px;
+  height: 130px;
+
+  display: grid;
+  grid-template-columns:
+    minmax(125px, 1.05fr)
+    1px
+    minmax(110px, 1fr)
+    1px
+    minmax(110px, 1fr)
+    1px
+    minmax(110px, 1fr);
+  align-items: center;
+  column-gap: 22px;
+}
+
+.summaryActivityBox{
+  position: relative;
+  height: 100px;
+  min-width: 0;
+}
+
+.summaryActivityBoxBg{
+  position: absolute;
+  inset: 0;
+  border-radius: 2px;
+  background: #fefefe;
+  border: 0.5px solid #efefef;
+  box-sizing: border-box;
+  box-shadow: 2px 2px 4px #f7f7f7;
+}
+
+.summaryActivityBoxDual{
+  width: 100%;
+}
+
+.summaryActivityTopValue{
+  position: absolute;
+  top: 8px;
+  left: 7px;
+  right: 7px;
+  height: 22px;
+  z-index: 1;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 20px;
+  line-height: 1;
+  font-weight: 400;
+  color: #000;
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+}
+
+.summaryActivityTopLabel{
+  position: absolute;
+  top: 31px;
+  left: 7px;
+  right: 7px;
+  height: 11px;
+  z-index: 1;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 300;
+  color: #000;
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+}
+
+.summaryActivitySplit{
+  position: absolute;
+  top: 51px;
+  left: 18px;
+  right: 18px;
+  height: 1px;
+  z-index: 1;
+  background: #000;
+}
+
+.summaryActivityBottomValue{
+  position: absolute;
+  top: 59px;
+  left: 5px;
+  right: 5px;
+  height: 22px;
+  z-index: 1;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 20px;
+  line-height: 1;
+  font-weight: 400;
+  color: #000;
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+}
+
+.summaryActivityBottomLabel{
+  position: absolute;
+  top: 82px;
+  left: 5px;
+  right: 5px;
+  height: 11px;
+  z-index: 1;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 300;
+  color: #000;
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+}
+
+.summaryActivityValue{
+  position: absolute;
+  top: 25px;
+  left: 7px;
+  right: 7px;
+  height: 27px;
+  z-index: 1;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 400;
+  color: #000;
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+}
+
+.summaryActivityLabel{
+  position: absolute;
+  top: 67px;
+  left: 7px;
+  right: 7px;
+  height: 11px;
+  z-index: 1;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 300;
+  color: #000;
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+}
+
+.summaryActivityDivider{
+  width: 1px;
+  height: 86px;
+  background: #000;
+  justify-self: center;
+  opacity: 0.9;
+}
+
+
+/* ===== mid grid ===== */
+.midGrid{
+  margin-top: 18px;
+  padding-bottom: 25px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 390px;
+  gap: 18px;
+  align-items: stretch;
+}
+
+.dashboardContent{
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.statisticsGraphCard{
+  position: relative;
+  height: 241px;
+}
+
+.statisticsGraphBg{
+  position: absolute;
+  inset: 0;
+  border-radius: 2px;
+  background: #fefefe;
+  border: 1px solid #efefef;
+  box-sizing: border-box;
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.statisticsTabs{
+  position: absolute;
+  top: 1px;
+  left: 29px;
+  right: 23px;
+  height: 49px;
+  display: grid;
+  grid-template-columns: 195px 235px 1fr;
+  align-items: center;
+}
+
+.statisticsTabsDividerLeft,
+.statisticsTabsDividerRight{
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 46px;
+  background: #000;
+}
+
+.statisticsTabsDividerLeft{ left: 195px; }
+.statisticsTabsDividerRight{ left: 430px; }
+
+.statisticsTabsUnderline{
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: #000;
+}
+
+.statisticsTabBtn{
+  position: relative;
+  z-index: 1;
+  height: 46px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  color: #000;
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+}
+
+.statisticsTabBtnActive{
+  background: #a8dadc;
+  border: 1px solid #a8dadc;
+}
+
+.statisticsBarsWrap{
+  position: absolute;
+  left: 54px;
+  right: 47px;
+  top: 80px;
+  bottom: 14px;
+}
+
+.statisticsBarsBaseline{
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 27px;
+  height: 1px;
+  background: #000;
+}
+
+.statisticsBarsRow{
+  position: absolute;
+  inset: 0 0 0 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 10px;
+}
+
+.statisticsBarItem{
+  width: 76px;
+  height: 147px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.statisticsBar{
+  width: 46px;
+  background: #9f81c7;
+  border: 1px solid #000;
+  box-sizing: border-box;
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.statisticsBarValue{
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(28px + 100%);
+  width: 46px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fefefe;
+  z-index: 2;
+}
+
+.statisticsBarLabel{
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  min-height: 22px;
+  font-size: 10px;
+  line-height: 1.15;
+  color: #000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.allStatisticsBody{
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  top: 66px;
+  bottom: 14px;
+}
+
+.allStatisticsToggleRow{
+  display: flex;
+  justify-content: space-between;
+  padding: 0 12px;
+  margin-bottom: 10px;
+}
+
+.allStatisticsToggle{
+  min-width: 101px;
+  height: 18px;
+  border-radius: 2px;
+  background: #92d5de;
+  border: 1px solid #92d5de;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 500;
+  color: #000;
+}
+
+.donutSection{
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr;
+  gap: 20px;
+  align-items: center;
+  height: calc(100% - 28px);
+}
+
+.donutSectionDivider{
+  width: 1px;
+  height: 131px;
+  background: #000;
+  justify-self: center;
+}
+
+.donutBlock{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.donutRing{
+  width: 138px;
+  height: 138px;
+  border-radius: 999px;
+  border: 1px solid #3c464f;
+  display: grid;
+  place-items: center;
+}
+
+.donutHole{
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #3a4352;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  color: #000;
+}
+
+.donutLegendGrid{
+  width: 180px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+}
+
+.donutLegendGridSingle{
+  width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.donutLegendItem,
+.donutLegendItemWide{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 11px;
+}
+
+.donutLegendValue{
+  font-weight: 500;
+}
+
+.donutLegendLabel{
+  font-weight: 300;
+}
+
+.activityOverviewCard{
+  position: relative;
+  height: 442px;
+}
+
+.activityOverviewBg{
+  position: absolute;
+  inset: 0;
+  border-radius: 2px;
+  background: #fefefe;
+  border: 1px solid #efefef;
+  box-sizing: border-box;
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.activityOverviewHeader{
+  position: absolute;
+  top: 20px;
+  left: 29px;
+  right: 28px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.activityOverviewTitle{
+  font-size: 16px;
+  color: #000;
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+}
+
+.activityOverviewAddBtn{
+  width: 60px;
+  height: 40px;
+  border-radius: 2px;
+  border: 2px solid #000;
+  background: #f5f5f5;
+  cursor: pointer;
+  font-size: 30px;
+  line-height: 1;
+}
+
+.activityOverviewScroll{
+  position: absolute;
+  top: 75px;
+  left: 29px;
+  right: 24px;
+  bottom: 26px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 6px;
+}
+
+.activityOverviewScroll::-webkit-scrollbar{
+  width: 8px;
+}
+
+.activityOverviewScroll::-webkit-scrollbar-thumb{
+  background: rgba(0,0,0,0.18);
+  border-radius: 999px;
+}
+
+.activityTableRow{
+  min-height: 75px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.98);
+  border: 0.5px solid rgba(42, 42, 42, 0.5);
+  box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.12);
+  display: grid;
+  grid-template-columns: 84px minmax(150px, 1fr) 1px 84px 1px 84px 1px 62px 1px 58px;
+  align-items: center;
+  padding: 0 12px;
+  column-gap: 10px;
+  box-sizing: border-box;
+  opacity: 0.96;
+}
+
+.activityThumbWrap{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.activityThumbCard{
+  width: 52px;
+  height: 52px;
+  position: relative;
+}
+
+.activityThumbPieceTop,
+.activityThumbPieceBottom{
+  position: absolute;
+  border: 1px solid rgba(42,42,42,0.7);
+  border-radius: 2px;
+}
+
+.activityThumbPieceTop{
+  top: 2px;
+  left: 2px;
+  width: 30px;
+  height: 30px;
+  background: #e9c88b;
+}
+
+.activityThumbPieceBottom{
+  right: 2px;
+  bottom: 2px;
+  width: 30px;
+  height: 30px;
+  background: #5f8f97;
+  transform: rotate(-18deg);
+}
+
+.activityNameCell{
+  font-size: 13px;
+  line-height: 1.28;
+  color: #000;
+}
+
+.activityDivider{
+  width: 1px;
+  height: 47px;
+  background: #b3b3b3;
+  justify-self: center;
+}
+
+.activityInfoCell,
+.activityInfoCellXp{
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.activityInfoHead{
+  font-size: 12px;
+  color: #4f4f4f;
+}
+
+.activityInfoValue{
+  font-size: 10px;
+  font-weight: 300;
+  color: #000;
+}
+
+.activityStatusColumn{
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.activityStatusBadge{
+  width: 50px;
+  height: 18px;
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 300;
+  background: #f4f4f4;
+  color: #000;
+}
+
+.activityStatusBadgePending{ background: #ffd186; }
+.activityStatusBadgeJoin{ background: #bfeabb; }
+.activityStatusBadgeEnded{ background: #fab8bb; }
+
+.sideParticipantsCol{
+  padding-top: 0;
+  align-self: stretch;
+  min-height: 0;
+}
+
+.rightPanel{
+  position: relative;
+  height: 100%;
+  min-height: calc(241px + 18px + 442px);
+  border: 1px solid #efefef;
+  border-radius: 2px;
+  background: #fefefe;
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.10);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.rightTitle{
+  position: absolute;
+  top: 16px;
+  left: 20px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #000;
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+}
+
+.studentsListScroller{
+  position: absolute;
+  top: 46px;
+  left: 18px;
+  right: 12px;
+  bottom: 18px;
+  overflow-y: auto;
+  padding-right: 6px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.studentsListScroller::-webkit-scrollbar{
+  width: 8px;
+}
+
+.studentsListScroller::-webkit-scrollbar-thumb{
+  background: #717171;
+  border-radius: 999px;
+}
+
+.studentsListScroller::-webkit-scrollbar-track{
+  background: #efefef;
+}
+
+.studentRowButton{
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.studentRowCard{
+  position: relative;
+  min-height: 50px;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 74px;
+  gap: 11px;
+  align-items: center;
+  padding: 5px 8px;
+  border-radius: 2px;
+  background: #f7f7f7;
+  border: 0.5px solid rgba(42, 42, 42, 0.25);
+  box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.10);
+  box-sizing: border-box;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.studentRowButton:hover .studentRowCard{
+  transform: translateY(-1px);
+  box-shadow: 1px 2px 4px rgba(0, 0, 0, 0.12);
+  border-color: rgba(42, 42, 42, 0.38);
+}
+
+.studentAvatar{
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: #2a2a2a;
+  overflow: hidden;
+}
+
+.studentAvatarInitials{
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.studentMeta{
+  min-width: 0;
+}
+
+.studentName{
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #000;
+  margin-bottom: 3px;
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+}
+
+.studentSubtitle{
+  font-size: 9px;
+  line-height: 1.2;
+  font-weight: 300;
+  color: rgba(0,0,0,0.62);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+}
+
+.studentScoreArea{
+  display: grid;
+  grid-template-columns: 28px 36px;
+  align-items: end;
+  justify-content: end;
+  gap: 4px;
+}
+
+.studentScore{
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  color: #000;
+  text-align: right;
+  padding-bottom: 5px;
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+}
+
+.studentMedal{
+  position: relative;
+  width: 36px;
+  height: 43px;
+}
+
+.studentMedalRibbonLeft,
+.studentMedalRibbonRight{
+  position: absolute;
+  top: 21px;
+  width: 10px;
+  height: 18px;
+  clip-path: polygon(0 0, 100% 0, 72% 100%, 50% 82%, 28% 100%);
+}
+
+.studentMedalRibbonLeft{
+  left: 8px;
+  background: linear-gradient(180deg, #4c91ff 0%, #2d5fd3 100%);
+}
+
+.studentMedalRibbonRight{
+  left: 18px;
+  background: linear-gradient(180deg, #ff9a67 0%, #d96f46 100%);
+}
+
+.studentMedalBadge{
+  position: absolute;
+  top: 0;
+  left: 5px;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: repeating-conic-gradient(#d86a91 0deg 18deg, #f6c6d5 18deg 36deg);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.10);
+}
+
+.studentMedalCore{
+  position: absolute;
+  top: 4px;
+  left: 9px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  color: #5f7df0;
+  font-size: 10px;
+  line-height: 1;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08);
+}
+
+.figmaPopupOverlay{
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  z-index: 140;
+  background: rgba(0, 0, 0, 0.1);
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+
+.activityTypePopup{
+  position: relative;
+  width: min(573px, calc(100vw - 40px));
+  height: 113px;
+  max-width: 100%;
+}
+
+.activityTypePopupBg{
+  position: absolute;
+  inset: 0;
+  border-radius: 2px;
+  background: #fefefe;
+  border: 1px solid #717171;
+  box-sizing: border-box;
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.activityTypePopupInner{
+  position: absolute;
+  top: 20px;
+  left: 32px;
+  right: 32px;
+  height: 74px;
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr 1px 1fr;
+  align-items: center;
+  gap: 0;
+}
+
+.activityTypePopupDivider{
+  width: 1px;
+  height: 75px;
+  background: #000;
+  justify-self: center;
+}
+
+.activityTypePopupItem{
+  position: relative;
+  height: 74px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.activityTypePopupItemBox{
+  position: absolute;
+  top: 0;
+  left: 8px;
+  right: 8px;
+  bottom: 0;
+  border: 5px solid #a8dadc;
+  box-sizing: border-box;
+}
+
+.activityTypePopupItemText{
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: #000;
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+}
+
+/* ===== modal (popup add employee) ===== */
+.modalOverlay{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.25);
+  display: grid;
+  place-items: center;
+  z-index: 50;
+  padding: 20px;
+}
+
+.modal{
+  width: min(720px, 100%);
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,0.15);
+  box-shadow: 0 22px 40px rgba(0,0,0,0.18);
+  overflow: hidden;
+}
+
+.modalHeader{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(0,0,0,0.10);
+}
+
+.modalTitle{
+  margin: 0;
+  font-size: 18px;
+}
+
+.modalClose{
+  width: 36px;
+  height: 34px;
+  border-radius: 8px;
+  border: 2px solid rgba(0,0,0,0.20);
+  background: #fff;
+  cursor: pointer;
+}
+
+.modalBody{
+  padding: 16px;
+}
+
+.modalFooter{
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 16px;
+  border-top: 1px solid rgba(0,0,0,0.10);
+}
+
+/* ===== reuse form styles (จากหน้า fill-more-info) ===== */
+.grid2{
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: 22px;
+  row-gap: 22px;
+  margin-bottom: 14px;
+}
+
+.input{
+  height: 56px;
+  border-radius: 4px;
+  border: 2px solid rgba(0,0,0,0.28);
+  padding: 0 14px;
+  font-size: 16px;
+  width: 100%;
+  display: block;
+  box-sizing: border-box;
+}
+
+.checkRow{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.checkInput{
+  width: 26px;
+  height: 26px;
+  accent-color: #84A59D;
+}
+
+.checkText{
+  font-size: 16px;
+  border-bottom: 2px solid rgba(0,0,0,0.18);
+  padding-bottom: 6px;
+}
+
+.avatarPickTitle{
+  margin-top: 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(0,0,0,0.65);
+}
+
+.avatarPickRow{
+  margin-top: 8px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.avatarPickBtn{
+  width: 74px;
+  height: 74px;
+  border-radius: 10px;
+  border: 2px solid rgba(0,0,0,0.18);
+  background: #fff;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.avatarPickBtnOn{
+  border-color: rgba(132,165,157,0.95);
+  box-shadow: 0 0 0 3px rgba(132,165,157,0.25);
+}
+
+.avatarPickImg{
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+}
+
+.errorText{
+  margin-top: 12px;
+  color: crimson;
+  font-size: 13px;
+}
+
+.primaryBtn{
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 2px solid rgba(0,0,0,0.25);
+  background: #fff;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.secondaryBtn{
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 2px solid rgba(0,0,0,0.25);
+  background: transparent;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.avatarTileEmpty{
+  border: 1px dashed rgba(0,0,0,0.25);
+  border-radius: 6px;
+  background: rgba(0,0,0,0.02);
+  cursor: pointer;
+  padding: 10px 8px;
+}
+
+.emptyAvatarCircle{
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  border: 1px dashed rgba(0,0,0,0.35);
+  display: grid;
+  place-items: center;
+  margin: 0 auto 6px;
+  color: rgba(0,0,0,0.5);
+  font-weight: 800;
+}
+
+.avatarNameMuted{
+  text-align: center;
+  font-size: 11px;
+  color: rgba(0,0,0,0.4);
+}
+
+@media (max-width: 1100px){
+  .page{ grid-template-columns: 96px 1fr; }
+
+  .topGrid{
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "org"
+      "summary"
+      "avatar"
+      "summaryActivities";
+  }
+
+  .midGrid{ grid-template-columns: 1fr; }
+  .sideParticipantsCol{
+    padding-top: 0;
+    align-self: auto;
+  }
+  .rightPanel{
+    height: 341px;
+    min-height: 341px;
+  }
+
+  .summaryOfActivities{
+    height: auto;
+    min-height: 129px;
+  }
+
+  .summaryOfActivitiesInner{
+    position: relative;
+    top: auto;
+    left: auto;
+    right: auto;
+    height: auto;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    overflow-x: auto;
+  }
+
+  .summaryActivityBox{
+    flex: 0 0 125px;
+  }
+
+  .summaryActivityDivider{
+    flex: 0 0 1px;
+  }
+
+  .statisticsTabs{
+    left: 16px;
+    right: 16px;
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  .statisticsTabsDividerLeft{ left: 33.333%; }
+  .statisticsTabsDividerRight{ left: 66.666%; }
+
+  .statisticsBarsWrap{ left: 22px; right: 22px; }
+
+  .statisticsBarsRow{
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .allStatisticsBody{ left: 16px; right: 16px; }
+
+  .donutSection{
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 14px;
+  }
+
+  .donutSectionDivider{ display: none; }
+
+  .activityOverviewScroll{ left: 16px; right: 16px; }
+
+  .activityTableRow{
+    grid-template-columns: 70px minmax(150px, 1fr) 1px 76px 1px 76px 1px 54px 1px 58px;
+    column-gap: 8px;
+  }
+
+  .avatarRow{ flex-wrap: wrap; }
+}
+
+.orgEditBtnIcon{
+  object-fit: fill;
+  display: block;
+}
+
+.orgLogoImg{
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  object-fit: cover;
+  display: block;
+}
+
+/* ===== edit organization popup ===== */
+.orgPopupOverlay{
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: rgba(113, 113, 113, 0.30);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.orgPopupCard{
+  position: relative;
+  width: min(720px, calc(100vw - 40px));
+  height: 665px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.12);
+  box-shadow: 0 16px 26px rgba(0, 0, 0, 0.08);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.orgPopupInner{
+  position: absolute;
+  top: 24px;
+  left: 28px;
+  right: 28px;
+  bottom: 92px;
+}
+
+.orgPopupScroll{
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  padding-right: 10px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.orgPopupScroll::-webkit-scrollbar{ width: 10px; }
+.orgPopupScroll::-webkit-scrollbar-thumb{ background: rgba(0,0,0,0.18); border-radius: 10px; }
+.orgPopupScroll::-webkit-scrollbar-track{ background: transparent; }
+
+.popupSectionTitle{
+  font-size: 20px;
+  font-weight: 500;
+  margin: 6px 0 6px;
+  color: #000;
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+}
+
+.popupGridOrgName{
+  display: grid;
+  grid-template-columns: 1.45fr 0.55fr;
+  column-gap: 22px;
+  row-gap: 22px;
+}
+
+.popupGrid2{
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: 22px;
+  row-gap: 22px;
+}
+
+.popupInput{
+  height: 60px;
+  border-radius: 4px;
+  border: 2px solid rgba(0,0,0,0.28);
+  padding: 14px;
+  font-size: 16px;
+  width: 100%;
+  display: block;
+  box-sizing: border-box;
+  background: #fff;
+  color: #000;
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+}
+
+.popupInput::placeholder{
+  color: rgba(0,0,0,0.62);
+}
+
+.popupAboutLogo{
+  display: grid;
+  grid-template-columns: 1fr 220px;
+  gap: 22px;
+  align-items: start;
+}
+
+.popupTextarea{
+  height: 220px;
+  border-radius: 4px;
+  border: 2px solid rgba(0,0,0,0.28);
+  padding: 16px;
+  font-size: 16px;
+  resize: none;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+  background: #fff;
+  color: #000;
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+}
+
+.popupTextarea::placeholder{
+  color: rgba(0,0,0,0.62);
+}
+
+.popupLogoBox{
+  border: 2px solid rgba(0,0,0,0.28);
+  border-radius: 4px;
+  padding: 14px 14px 16px;
+  background: #fff;
+  height: 220px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.popupLogoLabel{
+  font-size: 18px;
+  font-weight: 500;
+  text-align: center;
+  margin: 0;
+  color: #000;
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+}
+
+.popupLogoDrop{
+  display: block;
+  cursor: pointer;
+  flex: 1;
+}
+
+.popupHiddenFile{
+  display: none;
+}
+
+.popupLogoDropInner{
+  height: 100%;
+  border: 2px dashed rgba(0,0,0,0.45);
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  position: relative;
+  background: #fff;
+}
+
+.popupUploadText{
+  color: rgba(0,0,0,0.55);
+  font-size: 16px;
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+}
+
+.popupLogoPreview{
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.popupDivider{
+  height: 2px;
+  background: rgba(0,0,0,0.22);
+  margin: 10px 0;
+}
+
+.popupActionRow{
+  position: absolute;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+/* .popupIconButton{
+  width: 60px;
+  height: 60px;
+  border: 2px solid #000;
+  border-radius: 2px;
+  background: #f7f7f7;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+} */
+
+.popupActionIcon{
+  width: 60px;
+  height: 60px;
+  object-fit: contain;
+  display: block;
+}
+
+@media (max-width: 1024px){
+  .popupAboutLogo{
+    grid-template-columns: 1fr;
+  }
+
+  .popupLogoBox{
+    height: auto;
+  }
+
+  .popupLogoDropInner{
+    height: 140px;
+  }
+}
+
+/* ===== saved popup ===== */
+.savedPopupOverlay{
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  background: rgba(0, 0, 0, 0.10);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.savedPopupCard{
+  position: relative;
+  width: min(378px, calc(100vw - 40px));
+  height: 241px;
+}
+
+.savedPopupBg{
+  position: absolute;
+  inset: 0;
+  border-radius: 5px;
+  background: #fefefe;
+  border: 1px solid #347464;
+  box-sizing: border-box;
+  box-shadow: 2px 2px 4px #347464;
+}
+
+.savedPopupIcon{
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 60px;
+  object-fit: contain;
+}
+
+.savedPopupTitle{
+  position: absolute;
+  left: 49px;
+  right: 49px;
+  top: 120px;
+  height: 66px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: 800;
+  color: #000;
+  font-family: "Rounded Mplus 1c", Arial, sans-serif;
+}
+
+.cropOverlay{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  display: grid;
+  place-items: center;
+  z-index: 9999;
+}
+
+.cropModal{
+  width: 520px;
+  background: #fff;
+  border: 2px solid rgba(0,0,0,0.28);
+  border-radius: 8px;
+  box-shadow: 0 18px 40px rgba(0,0,0,0.22);
+  padding: 16px;
+}
+
+.cropHeader{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.cropTitle{
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.cropClose{
+  width: 36px;
+  height: 36px;
+  border: 2px solid rgba(0,0,0,0.28);
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.cropBox{
+  position: relative;
+  margin: 0 auto;
+  border: 2px solid rgba(0,0,0,0.22);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f6f6f6;
+}
+
+.cropImg{
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform-origin: center;
+  user-select: none;
+  pointer-events: none;
+}
+
+.cropDragLayer{
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+}
+
+.cropDragLayer:active{
+  cursor: grabbing;
+}
+
+.cropControls{
+  margin-top: 12px;
+}
+
+.cropLabel{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.cropLabel input[type="range"]{
+  flex: 1;
+}
+
+.cropActions{
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.cropBtn{
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 6px;
+  border: 2px solid rgba(0,0,0,0.28);
+  background: #fff;
+  cursor: pointer;
+}
+
+.cropBtnPrimary{
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 6px;
+  border: 2px solid #837e56;
+  background: #EFE69D;
+  cursor: pointer;
+  font-weight: 700;
+}

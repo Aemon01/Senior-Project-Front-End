@@ -24,7 +24,7 @@ export async function POST(req: Request) {
       })
     );
 
-    // ✅ เคสถูก invite: ต้องตั้งรหัสใหม่ก่อน
+    // เคสถูก invite: ต้องตั้งรหัสใหม่ก่อน
     if (res.ChallengeName === "NEW_PASSWORD_REQUIRED") {
       return NextResponse.json(
         {

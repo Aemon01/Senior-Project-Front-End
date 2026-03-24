@@ -118,7 +118,7 @@ export default function RegisterPage() {
               try {
                 const body: any = { email: em, password: pw, role: accountType };
 
-                const r = await fetch("/api/auth/sign-up", {
+                const r = await fetch("/api/auth/register", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify(body),

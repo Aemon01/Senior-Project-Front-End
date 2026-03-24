@@ -1,6 +1,12 @@
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Html, OrbitControls, PerspectiveCamera, useGLTF } from "@react-three/drei";
+import {
+  Html,
+  OrbitControls,
+  PerspectiveCamera,
+  useAnimations,
+  useGLTF,
+} from "@react-three/drei";
 import {
   Suspense,
   useCallback,
@@ -26,6 +32,7 @@ import type {
   PickBuildingPayload,
   YawAnimState,
 } from "../types";
+import { SkeletonUtils } from "three-stdlib";
 
 type MapCanvasProps = {
   controlsRef: MutableRefObject<OrbitControlsImpl | null>;
@@ -36,6 +43,7 @@ type MapCanvasProps = {
   avatarRef: MutableRefObject<THREE.Group | null>;
   avatarPos: THREE.Vector3 | null;
   userName: string;
+  avatarModelUrl?: string;
   hoverBuilding: HoverBuildingPayload;
   onRoadMeshesOnce: (roads: THREE.Mesh[]) => void;
   onPickRoadPoint: (p: THREE.Vector3) => void;
@@ -44,6 +52,21 @@ type MapCanvasProps = {
   onCameraAnimDone: (company: Company | null) => void;
   resolveCompany: (meshName: string) => Company | null;
 };
+
+function pickLoopClip(names: string[]) {
+  const lower = names.map((n) => n.toLowerCase());
+
+  const idleIdx = lower.findIndex((n) => n.includes("idle"));
+  if (idleIdx >= 0) return names[idleIdx];
+
+  const walkIdx = lower.findIndex((n) => n.includes("walk"));
+  if (walkIdx >= 0) return names[walkIdx];
+
+  const runIdx = lower.findIndex((n) => n.includes("run"));
+  if (runIdx >= 0) return names[runIdx];
+
+  return names[0] ?? null;
+}
 
 function CameraAnimator({
   animRef,
@@ -79,7 +102,6 @@ function CameraAnimator({
       anim.active = false;
       const company = anim.pendingCompany;
       animRef.current = null;
-
       isAnimatingRef.current = false;
       onDone(company);
     }
@@ -118,12 +140,9 @@ function YawAnimator({
 
     if (t >= 1) {
       anim.active = false;
-
       ctrls.minAzimuthAngle = anim.toYaw - anim.range;
       ctrls.maxAzimuthAngle = anim.toYaw + anim.range;
-
       ctrls.enableDamping = anim.prevEnableDamping;
-
       yawAnimRef.current = null;
       isAnimatingRef.current = false;
     }
@@ -329,7 +348,9 @@ const Avatar = React.forwardRef<
   }
 >(({ modelUrl = "/models/boy.glb", position, scale = 3 }, ref) => {
   const groupRef = useRef<THREE.Group | null>(null);
-  const { scene } = useGLTF(modelUrl);
+  const gltf = useGLTF(modelUrl);
+  const clonedScene = useMemo(() => SkeletonUtils.clone(gltf.scene), [gltf.scene]);
+  const { actions, names, mixer } = useAnimations(gltf.animations, groupRef);
 
   useEffect(() => {
     if (!groupRef.current || !position) return;
@@ -342,9 +363,32 @@ const Avatar = React.forwardRef<
     else (ref as any).current = groupRef.current;
   }, [ref]);
 
+  useEffect(() => {
+    if (!names?.length) return;
+
+    names.forEach((n) => actions[n]?.stop());
+
+    const clip = pickLoopClip(names);
+    if (!clip) return;
+
+    const action = actions[clip];
+    action?.reset();
+    action?.setLoop(THREE.LoopRepeat, Infinity);
+    action?.fadeIn(0.2);
+    action?.play();
+
+    return () => {
+      names.forEach((n) => actions[n]?.stop());
+    };
+  }, [actions, names, modelUrl]);
+
+  useFrame((_, dt) => {
+    mixer?.update(dt);
+  });
+
   return (
     <group ref={groupRef} scale={scale}>
-      <primitive object={scene} />
+      <primitive object={clonedScene} />
     </group>
   );
 });
@@ -388,13 +432,12 @@ function CinematicRig({
       controlsRef.current.target.copy(center);
       controlsRef.current.update();
     }
-  }, [camera, scene, controlsRef, CAMERA_PITCH, CAMERA_YAW_A]);
+  }, [camera, scene, controlsRef]);
 
   useFrame(() => {
     const ctrls = controlsRef.current;
     const cam = camera as THREE.PerspectiveCamera;
     if (!ctrls || !cam) return;
-
     if (isAnimatingRef.current) return;
 
     const off = cam.position.clone().sub(ctrls.target);
@@ -440,6 +483,7 @@ export default function MapCanvas({
   avatarRef,
   avatarPos,
   userName,
+  avatarModelUrl,
   hoverBuilding,
   onRoadMeshesOnce,
   onPickRoadPoint,
@@ -514,7 +558,14 @@ export default function MapCanvas({
           </Html>
         ) : null}
 
-        <Avatar ref={avatarRef} position={avatarPos} scale={3} />
+        <Avatar
+          key={avatarModelUrl || "/models/boy.glb"}
+          ref={avatarRef}
+          modelUrl={avatarModelUrl || "/models/boy.glb"}
+          position={avatarPos}
+          scale={3}
+        />
+
         <NameTag targetRef={avatarRef as any} name={userName} />
       </Suspense>
     </Canvas>

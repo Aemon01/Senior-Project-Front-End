@@ -1,8 +1,8 @@
 import OrgSidebar from "@/components/shared/organization/OrgSidebar";
 import { ORGANIZATION_SIDEBAR_ITEMS } from "@/lib/config/organization/routes";
-// import ClientDashboard from "./ClientDashboard";
+import ActivityDashboard from "./ActivityDashboard";
 
-export default function StudentDashboardPage() {
+export default function OrgActivityDashboardPage() {
   return (
     <div style={{ background: "#F3EEE8", minHeight: "100vh", padding: 18, boxSizing: "border-box" }}>
       <div
@@ -30,7 +30,7 @@ export default function StudentDashboardPage() {
           }}
         >
           <div style={{ width: 1380 }}>
-            {/* <ClientDashboard /> */}
+            <ActivityDashboard/>
           </div>
         </main>
 

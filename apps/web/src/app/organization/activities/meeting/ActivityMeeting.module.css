@@ -1,0 +1,873 @@
+.page {
+    width: 100%;
+    max-width: 1087px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 573px 470px;
+    gap: 44px;
+    align-items: start;
+    font-family: "Rounded Mplus 1c", sans-serif;
+    color: #000;
+}
+
+.column {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.card {
+    background: #fefefe;
+    border: 1px solid #efefef;
+    box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+    border-radius: 2px;
+    box-sizing: border-box;
+}
+
+.infoCard {
+    min-height: 399px;
+    padding: 28px 18px 34px;
+}
+
+.typeCard {
+    min-height: 139px;
+    padding: 20px 29px;
+}
+
+.speakerCard {
+    min-height: 607px;
+    padding: 28px 32px 24px;
+}
+
+.actionCard {
+    min-height: 139px;
+    padding: 22px 20px;
+}
+
+.rewardsCard {
+    min-height: 399px;
+    padding: 24px 19px 16px;
+}
+
+.settingsCard {
+    min-height: 607px;
+    padding: 29px 19px 24px;
+}
+
+.fieldLabel,
+.sectionLabel {
+    display: block;
+    font-size: 16px;
+    line-height: 26px;
+    margin-bottom: 8px;
+    color: #000;
+}
+
+.fieldLabel+.longInput {
+    margin-bottom: 13px;
+}
+
+.longInput,
+.largeTextarea,
+.shortInput,
+.shortInputFull,
+.bioTextarea,
+.miniFieldDate,
+.miniFieldTime,
+.maxInput {
+    width: 100%;
+    background: #f7f7f7;
+    border: 1.5px solid rgba(0, 0, 0, 0.5);
+    border-radius: 2px;
+    box-sizing: border-box;
+    color: rgba(0, 0, 0, 0.75);
+    font-family: inherit;
+    outline: none;
+}
+
+.longInput,
+.shortInput,
+.shortInputFull {
+    height: 39px;
+    padding: 0 14px;
+    font-size: 16px;
+}
+
+.longInput {
+    height: 81px;
+    display: block;
+}
+
+.largeTextarea {
+    min-height: 186px;
+    resize: none;
+    padding: 12px 14px;
+    font-size: 16px;
+}
+
+.bioTextarea {
+    min-height: 82px;
+    resize: none;
+    padding: 10px 14px;
+    font-size: 16px;
+}
+
+.shortInputFull {
+    height: 39px;
+}
+
+.longInput::placeholder,
+.largeTextarea::placeholder,
+.shortInput::placeholder,
+.shortInputFull::placeholder,
+.bioTextarea::placeholder,
+.miniFieldDate::placeholder,
+.miniFieldTime::placeholder,
+.maxInput::placeholder {
+    color: rgba(0, 0, 0, 0.6);
+}
+
+.typeRow {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    height: 99px;
+    border: 1px solid #000;
+    overflow: hidden;
+}
+
+.typeButton {
+    border: 5px solid #a8dadc;
+    background: #fff;
+    font-family: inherit;
+    font-size: 20px;
+    color: #000;
+    cursor: pointer;
+    transition: 0.15s ease;
+}
+
+.typeButton+.typeButton {
+    border-left-width: 1px;
+}
+
+.typeButtonActive {
+    background: #a8dadc;
+}
+
+.locationBlock {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.locationRow {
+    display: grid;
+    grid-template-columns: 132px 1fr;
+    gap: 12px;
+    align-items: center;
+}
+
+.locationToggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    font-family: inherit;
+    font-size: 20px;
+    color: #000;
+    cursor: pointer;
+    justify-content: flex-start;
+}
+
+.separator {
+    height: 1px;
+    background: #000;
+    margin: 18px 0 16px;
+}
+
+.formGroup {
+    margin-bottom: 14px;
+}
+
+.sectionLabel {
+    font-size: 18px;
+    margin-bottom: 8px;
+}
+
+.checkInWrap {
+    margin-top: 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.checkInTitle {
+    width: 150px;
+    font-size: 18px;
+    line-height: 26px;
+    text-align: center;
+    margin-bottom: 6px;
+}
+
+.checkInPreview {
+    width: 193px;
+    height: 180px;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    cursor: pointer;
+}
+
+.previewMap {
+    position: relative;
+    width: 193px;
+    height: 180px;
+    overflow: hidden;
+    border-radius: 4px;
+    border: 1px solid #d8d8d8;
+    background:
+        radial-gradient(circle at 10% 20%, rgba(255, 255, 255, 0.35) 0 5%, transparent 6%),
+        radial-gradient(circle at 75% 30%, rgba(255, 255, 255, 0.35) 0 5%, transparent 6%),
+        linear-gradient(135deg, #d7ead9 0%, #b7d8b6 100%);
+}
+
+.previewRoadA,
+.previewRoadB,
+.previewRoadC,
+.modalMapRoadA,
+.modalMapRoadB,
+.modalMapRoadC,
+.modalMapRoadD {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.previewRoadA {
+    width: 220px;
+    height: 26px;
+    top: 72px;
+    left: -10px;
+    transform: rotate(-11deg);
+}
+
+.previewRoadB {
+    width: 28px;
+    height: 210px;
+    top: -8px;
+    left: 86px;
+    transform: rotate(8deg);
+}
+
+.previewRoadC {
+    width: 170px;
+    height: 22px;
+    top: 124px;
+    right: -18px;
+    transform: rotate(26deg);
+}
+
+.previewMarkerOne,
+.previewMarkerTwo,
+.previewMarkerThree,
+.modalPinOne,
+.modalPinTwo,
+.modalPinThree {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    background: #e76f51;
+    border: 3px solid #fff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+.previewMarkerOne {
+    top: 36px;
+    left: 46px;
+}
+
+.previewMarkerTwo {
+    top: 98px;
+    left: 114px;
+}
+
+.previewMarkerThree {
+    top: 122px;
+    left: 54px;
+}
+
+.actionGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 13px;
+    position: relative;
+}
+
+.actionGrid::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(50% - 0.5px);
+    width: 1px;
+    background: #000;
+}
+
+.actionButton {
+    min-height: 92px;
+    border: 5px solid #a8dadc;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-family: inherit;
+    font-size: 20px;
+    color: #000;
+    cursor: pointer;
+}
+
+.actionDraft {
+    background: #d9d9d9;
+    border-color: #d9d9d9;
+}
+
+.actionPublish {
+    background: #fff;
+}
+
+.actionIcon {
+    width: 40px;
+    height: 40px;
+}
+
+.rewardsHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    padding: 0 11px;
+}
+
+.rewardsTitle {
+    font-size: 16px;
+    line-height: 26px;
+    text-align: left;
+}
+
+.smallIcon {
+    width: 26px;
+    height: 19px;
+    color: #000;
+}
+
+.skillList {
+    height: 171px;
+    overflow-y: auto;
+    padding-right: 4px;
+    margin: 0 11px;
+}
+
+.skillList::-webkit-scrollbar {
+    width: 8px;
+}
+
+.skillList::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.18);
+    border-radius: 999px;
+}
+
+.skillRow {
+    min-height: 48px;
+    display: grid;
+    grid-template-columns: 1fr 95px 49px;
+    align-items: center;
+    background: #f7f7f7;
+    border: 1px solid #b3b3b3;
+    border-radius: 2px;
+    margin-bottom: 9px;
+    font-size: 11px;
+    overflow: hidden;
+}
+
+.skillName,
+.skillLevel,
+.skillPercent {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    font-weight: 300;
+}
+
+.skillName {
+    padding: 0 20px;
+    text-align: left;
+}
+
+.skillLevel,
+.skillPercent {
+    justify-content: center;
+    border-left: 1px solid #b3b3b3;
+}
+
+.statsGrid {
+    margin-top: 14px;
+    border-top: 1px solid #000;
+    display: grid;
+    grid-template-columns: 145px 1fr 1fr;
+}
+
+.statCell {
+    min-height: 140px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 12px 14px;
+    box-sizing: border-box;
+}
+
+.statCell+.statCell {
+    border-left: 1px solid #000;
+}
+
+.statTitle {
+    font-size: 16px;
+    line-height: 26px;
+    margin-bottom: 14px;
+    text-align: center;
+}
+
+.xpBox,
+.uploadBox {
+    background: #f7f7f7;
+    border: 1px solid #b3b3b3;
+    border-radius: 2px;
+    font-family: inherit;
+    color: #000;
+}
+
+.xpBox {
+    width: 63px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 300;
+}
+
+.uploadBox {
+    width: 112px;
+    height: 64px;
+    font-size: 12px;
+    font-weight: 300;
+    cursor: pointer;
+}
+
+.statIconWrap {
+    margin-top: auto;
+    width: 69px;
+    height: 71px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6f6f6f;
+}
+
+.statIconSvg {
+    width: 52px;
+    height: 52px;
+}
+
+.optionGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    position: relative;
+}
+
+.optionGrid::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(50% - 0.5px);
+    width: 1px;
+    background: #000;
+}
+
+.optionCard {
+    min-height: 106px;
+    border: 5px solid #a8dadc;
+    background: #fff;
+    cursor: pointer;
+    font-family: inherit;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px;
+    box-sizing: border-box;
+}
+
+.optionCardActive {
+    background: #f8fffe;
+}
+
+.optionTitle {
+    font-size: 20px;
+    line-height: 1.15;
+    text-align: center;
+}
+
+.optionIcon {
+    width: 63px;
+    height: 61px;
+}
+
+.joinGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    position: relative;
+}
+
+.joinGrid::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(50% - 0.5px);
+    width: 1px;
+    background: #000;
+}
+
+.joinButton {
+    min-height: 45px;
+    border: 5px solid #a8dadc;
+    background: #fff;
+    font-family: inherit;
+    font-size: 16px;
+    color: #000;
+    cursor: pointer;
+}
+
+.joinButtonActive {
+    background: #f8fffe;
+}
+
+.periodSection {
+    padding: 0;
+}
+
+.periodTitle {
+    font-size: 16px;
+    line-height: 26px;
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.periodGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 34px;
+}
+
+.periodCol {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.periodLabel {
+    font-size: 13px;
+    line-height: 13px;
+    text-align: left;
+}
+
+.periodFields {
+    display: grid;
+    grid-template-columns: 122px 69px;
+    gap: 7px;
+    align-items: center;
+}
+
+.miniFieldDate,
+.miniFieldTime {
+    height: 25px;
+    padding: 0 8px;
+    font-size: 13px;
+}
+
+.maxRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+}
+
+.maxGroup {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.maxLabel {
+    font-size: 16px;
+    line-height: 26px;
+    white-space: nowrap;
+}
+
+.maxInput {
+    width: 159px;
+    height: 36px;
+    text-align: center;
+    font-size: 16px;
+    font-weight: 300;
+    padding: 0 10px;
+}
+
+.noToggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: transparent;
+    border: 0;
+    font-family: inherit;
+    font-size: 16px;
+    cursor: pointer;
+    color: #000;
+}
+
+.checkBox {
+    width: 25px;
+    height: 25px;
+    border-radius: 2px;
+    border: 1.5px solid #000;
+    background: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    font-family: inherit;
+}
+
+.checkBoxActive {
+    background: #a8dadc;
+}
+
+.modalOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(113, 113, 113, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 120;
+    padding: 16px;
+    box-sizing: border-box;
+}
+
+.modal {
+    width: min(573px, 100%);
+    height: 348px;
+    position: relative;
+    box-shadow: 0 4px 4px rgba(0, 0, 0, 0.25);
+    border-radius: 5px;
+    overflow: hidden;
+    background: #fefefe;
+    border: 1px solid #efefef;
+}
+
+.modalMap {
+    position: absolute;
+    inset: 3px 0 0;
+    background:
+        linear-gradient(90deg, rgba(255, 255, 255, 0.24) 1px, transparent 1px) 0 0 / 56px 56px,
+        linear-gradient(rgba(255, 255, 255, 0.24) 1px, transparent 1px) 0 0 / 56px 56px,
+        linear-gradient(135deg, #b7d8b6 0%, #7db8d0 100%);
+}
+
+.modalMapRoadA {
+    width: 660px;
+    height: 34px;
+    top: 180px;
+    left: -40px;
+    transform: rotate(-12deg);
+}
+
+.modalMapRoadB {
+    width: 36px;
+    height: 460px;
+    top: -60px;
+    left: 255px;
+    transform: rotate(10deg);
+}
+
+.modalMapRoadC {
+    width: 420px;
+    height: 28px;
+    right: -30px;
+    bottom: 54px;
+    transform: rotate(21deg);
+}
+
+.modalMapRoadD {
+    width: 270px;
+    height: 24px;
+    left: 62px;
+    top: 78px;
+    transform: rotate(14deg);
+}
+
+.modalPinOne {
+    top: 98px;
+    left: 145px;
+}
+
+.modalPinTwo {
+    top: 166px;
+    left: 298px;
+}
+
+.modalPinThree {
+    top: 228px;
+    left: 454px;
+}
+
+.modalSearch {
+    position: absolute;
+    top: 18px;
+    left: 45px;
+    right: 54px;
+    height: 47px;
+    border-radius: 2px;
+    background: rgba(245, 245, 245, 0.75);
+    border: 2px solid #000;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 0 11px;
+    box-sizing: border-box;
+}
+
+.modalSearchText {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: rgba(0, 0, 0, 0.7);
+    font-size: 20px;
+}
+
+.inlineIcon {
+    width: 32px;
+    height: 32px;
+    color: #000;
+    flex: 0 0 auto;
+}
+
+.okButton {
+    position: absolute;
+    right: 24px;
+    bottom: 12px;
+    width: 157px;
+    height: 33px;
+    background: #f4c98f;
+    border: 2px solid #000;
+    box-shadow: -5px 4px 0 #000;
+    color: #000;
+    font-family: inherit;
+    font-size: 20px;
+    text-transform: lowercase;
+    cursor: pointer;
+}
+
+.okButton span {
+    display: inline-flex;
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+}
+
+@media (max-width: 1140px) {
+    .page {
+        grid-template-columns: 1fr;
+        max-width: 700px;
+        gap: 20px;
+    }
+}
+
+@media (max-width: 700px) {
+
+    .infoCard,
+    .typeCard,
+    .speakerCard,
+    .actionCard,
+    .rewardsCard,
+    .settingsCard {
+        min-height: auto;
+    }
+
+    .typeRow,
+    .optionGrid,
+    .joinGrid,
+    .actionGrid,
+    .statsGrid,
+    .periodGrid,
+    .locationRow {
+        grid-template-columns: 1fr;
+    }
+
+    .optionGrid::before,
+    .joinGrid::before,
+    .actionGrid::before {
+        display: none;
+    }
+
+    .statsGrid {
+        border-top: 1px solid #000;
+    }
+
+    .statCell+.statCell {
+        border-left: 0;
+        border-top: 1px solid #000;
+    }
+
+    .periodFields {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .maxRow,
+    .maxGroup {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .maxInput {
+        width: 100%;
+    }
+
+    .modal {
+        height: 320px;
+    }
+
+    .modalSearch {
+        left: 16px;
+        right: 16px;
+    }
+
+    .okButton {
+        right: 18px;
+        bottom: 14px;
+    }
+}
