@@ -17,11 +17,11 @@ import styles from "./ActivityCourse.module.css";
    Types
 ========================= */
 type ActivityKind = "meetings" | "courses" | "challenges";
-type ActivityStatus = "draft" | "public";
+type ActivityStatus = "draft" | "publish";
 type AudienceAccess = "invitedOnly" | "everyone";
 type ParticipationMode = "joinAnytime" | "scheduledParticipation";
 type ContentType = "video" | "article";
-type AssessmentTab = "quiz" | "assignment";
+type AssessmentTab = "quiz";
 type QuestionType = "multipleChoice" | "shortAnswer";
 
 type ChoiceOption<T> = {
@@ -567,11 +567,11 @@ function ActivityStatusSection({
         <button
           type="button"
           className={`${styles.actionButton} ${
-            selectedStatus === "public"
+            selectedStatus === "publish"
               ? styles.statusButtonActive
               : styles.statusButtonInactive
           }`}
-          onClick={() => onSelectStatus("public")}
+          onClick={() => onSelectStatus("publish")}
         >
           <Image
             src="/images/icons/publish-icon.png"
@@ -1718,14 +1718,14 @@ function CourseBuilderSection({
               <span>Quiz</span>
             </button>
 
-            <button
+            {/* <button
               type="button"
               className={styles.lessonFeatureButton}
               onClick={() => onToggleLessonFlag("hasAssignment")}
             >
               <CheckBoxIcon checked={selectedLesson.hasAssignment} />
               <span>Assignment</span>
-            </button>
+            </button> */}
           </div>
         </div>
 
@@ -1742,7 +1742,7 @@ function CourseBuilderSection({
             >
               Quiz
             </button>
-            <button
+            {/* <button
               type="button"
               className={`${styles.assessmentTab} ${
                 assessmentTab === "assignment" ? styles.assessmentTabActive : ""
@@ -1750,7 +1750,7 @@ function CourseBuilderSection({
               onClick={() => onSelectAssessmentTab("assignment")}
             >
               Assignment
-            </button>
+            </button> */}
           </div>
 
           {assessmentTab === "quiz" ? (
@@ -2013,7 +2013,7 @@ export default function ActivityCourse() {
   const [selectedActivityType, setSelectedActivityType] =
     useState<ActivityKind>("courses");
   const [selectedActivityStatus, setSelectedActivityStatus] =
-    useState<ActivityStatus>("draft");
+    useState<ActivityStatus>("publish");
   const [selectedAudience, setSelectedAudience] =
     useState<AudienceAccess>("everyone");
   const [selectedParticipation, setSelectedParticipation] =
