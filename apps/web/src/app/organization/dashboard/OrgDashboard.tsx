@@ -267,90 +267,62 @@ export default function OrgDashboardPage() {
     const closeEditOrg = () => setIsEditOrgOpen(false);
 
     const handleSaveOrg = async (e: React.FormEvent) => {
-        // !TODO: Add API PUT/PATCH here
-        // Prevent default
         e.preventDefault();
-
-        // ตรงนี้ค่อยต่อ API PUT/PATCH ภายหลัง    
-        // Format data
-        const formData = new FormData();
-        formData.append("about_org", orgDraft.aboutUs);
-        formData.append("size", orgDraft.companySize);
-        formData.append("location", orgDraft.location);
-        formData.append("logo", orgDraft.logoFile || "");
-        formData.append("logoPreview", orgDraft.logoPreview || "");
-        formData.append("website_url", orgDraft.website);
-
-        // add file to S3
-        // const file = orgDraft.logoFile;
-        // if (file) {
-        //     const formData = new FormData();
-        //     formData.append("file", file);
-        //     const res = await fetch(`${BACKEND}/upload`, {
-        //         method: "POST",
-        //         headers: {
-        //             Authorization: `Bearer ${accessToken}`,
-        //         },
-        //         body: formData,
-        //     });
-        //     if (!res.ok) {
-        //         throw new Error("Failed to upload file");
-        //     }
-        //     const data = await res.json();
-        //     formData.append("logo", data.url);
-        // }
-
-        // Test add file to S3
-        const file = orgDraft.logoFile;
-        if (file) {
+        try {
+            setSaving(true);
             const formData = new FormData();
-            formData.append("file", file);
-            formData.append("bucketName", "vcep-assets-dev")
-            formData.append("folderName", "org-logos")
 
+            // Use Active-Account to get org_id
+            const activeAccount = await fetch("/api/organization/active-account", {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            });
 
+            const activeAccountData = await activeAccount.json();
+            const orgId = activeAccountData.org_id;
 
+            formData.append("orgId", orgId);
+            formData.append("orgName", orgDraft.orgName);
+            formData.append("companySize", orgDraft.companySize);
+            formData.append("businessType", orgDraft.businessType);
+            formData.append("location", orgDraft.location);
+            formData.append("aboutUs", orgDraft.aboutUs);
+            formData.append("email", orgDraft.email);
+            formData.append("phone", orgDraft.phone);
+            formData.append("website", orgDraft.website);
+            formData.append("linkedin", orgDraft.linkedin);
+            formData.append("facebook", orgDraft.facebook);
+            formData.append("instagram", orgDraft.instagram);
+            formData.append("youtube", orgDraft.youtube);
+            formData.append("tiktok", orgDraft.tiktok);
 
-            const res = await fetch(`/api/s3`, {
-                method: "PUT",
+            if (orgDraft.logoFile) {
+                formData.append("logoFile", orgDraft.logoFile);
+            }
+
+            const res = await fetch("/api/organization/update", {
+                method: "POST",
                 body: formData,
             });
-            if (!res.ok) {
-                throw new Error("Failed to upload file");
-            }
+
             const data = await res.json();
-            formData.append("logo", data.url);
+
+            if (!res.ok) {
+                throw new Error(data.message || "Failed to update organization");
+            }
+
+            setIsEditOrgOpen(false);
+            setIsSavedOpen(true);
+            setTimeout(() => setIsSavedOpen(false), 2000);
+
+            await fetchOrgDashboard();
+        } catch (error: any) {
+            setError(error.message);
+        } finally {
+            setSaving(false);
         }
-
-        // Backend Template
-        // {
-        // "about_org": "string",
-        // "building_id": "string",
-        // "contact": "{ \"email\": \"[EMAIL_ADDRESS]\", \"phone\": \"1234567890\" }",
-        // "logo": "string",
-        // "org_name": "string",
-        // "position_x": 0,
-        // "position_y": 0,
-        // "size": "string",
-        // "website_url": "string"
-        // }
-
-        // pack email, phone, facebook, instagram, youtube, tiktok
-        const contact = {
-            email: orgDraft.email,
-            phone: orgDraft.phone,
-            facebook: orgDraft.facebook,
-            instagram: orgDraft.instagram,
-            youtube: orgDraft.youtube,
-            tiktok: orgDraft.tiktok,
-        };
-        // Pack to json
-        const contactJson = JSON.stringify(contact);
-        formData.append("contact", contactJson);
-
-        console.log(orgDraft);
-        setIsEditOrgOpen(false);
-        setIsSavedOpen(true);
     };
 
     const closeSaved = () => setIsSavedOpen(false);
@@ -413,7 +385,7 @@ export default function OrgDashboardPage() {
 
         setSaving(true);
         try {
-            const r = await fetch("/api/org/employees/invite", {
+            const r = await fetch("/api/organization/employees/invite", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -469,11 +441,65 @@ export default function OrgDashboardPage() {
 
     useEffect(() => {
         (async () => {
-            const r = await fetch("/api/org/active-account");
+            const r = await fetch("/api/organization/active-account");
             const d = await r.json().catch(() => ({}));
             if (r.ok && d?.ok) setActiveEmployeeEmail(String(d.email || "").toLowerCase());
         })();
     }, []);
+
+    // =======================
+    // Update Org API
+    // =======================
+    //---------------------------------------------------------------------------------------------------------
+    const handleUpdateOrg = async () => {
+        try {
+            setSaving(true);
+            // setError(null);
+
+            const formData = new FormData();
+            formData.append("orgName", orgDraft.orgName);
+            formData.append("companySize", orgDraft.companySize);
+            formData.append("businessType", orgDraft.businessType);
+            formData.append("location", orgDraft.location);
+            formData.append("aboutUs", orgDraft.aboutUs);
+            formData.append("email", orgDraft.email);
+            formData.append("phone", orgDraft.phone);
+            formData.append("website", orgDraft.website);
+            formData.append("linkedin", orgDraft.linkedin);
+            formData.append("facebook", orgDraft.facebook);
+            formData.append("instagram", orgDraft.instagram);
+            formData.append("youtube", orgDraft.youtube);
+            formData.append("tiktok", orgDraft.tiktok);
+
+            if (orgDraft.logoFile) {
+                formData.append("logoFile", orgDraft.logoFile);
+            }
+
+            const res = await fetch("/api/organization/update", {
+                method: "POST",
+                body: formData,
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.message || "Failed to update organization");
+            }
+
+            setIsEditOrgOpen(false);
+            setIsSavedOpen(true);
+            setTimeout(() => setIsSavedOpen(false), 2000);
+
+            // Refresh org data
+            await fetchOrgDashboard();
+
+        } catch (error: any) {
+            setError(error.message);
+        } finally {
+            setSaving(false);
+        }
+    };
+    //---------------------------------------------------------------------------------------------------------
 
     // =======================
     // Load and Update Data
@@ -491,6 +517,21 @@ export default function OrgDashboardPage() {
         const resJson = await res.json();
         const data = resJson.data.orgDashboard;
         setOrgDashboard(data);
+
+        if (data && Array.isArray(data.employees_info)) {
+            const mapped = data.employees_info.map((emp: any) => ({
+                id: emp.emp_id,
+                firstName: emp.first_name || "",
+                lastName: emp.last_name || "",
+                position: emp.position || "",
+                phone: emp.phone || "",
+                email: emp.email || "",
+                canCheckChallenge: emp.is_reviewer,
+                avatarIndex: 0,
+            }));
+            setEmployees(mapped);
+        }
+
         return data;
     }, [])
 

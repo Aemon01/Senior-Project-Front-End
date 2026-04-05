@@ -46,6 +46,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, message: "missing avatarId" }, { status: 400 });
     }
 
+    try {
+      const dbEmpCheck = await pool.query(`SELECT COUNT(*) FROM employee WHERE org_id = $1`, [orgId]);
+      const dbEmpCount = parseInt(dbEmpCheck.rows[0].count);
+      
+      const dbInvCheck = await pool.query(`SELECT COUNT(*) FROM employee_invitations WHERE org_id = $1 AND used_at IS NULL AND expires_at > NOW()`, [orgId]);
+      const dbInvCount = parseInt(dbInvCheck.rows[0].count);
+
+      if ((dbEmpCount + dbInvCount) >= 3) {
+        return NextResponse.json({ ok: false, message: "Organization already has the maximum of 3 employees/invites." }, { status: 400 });
+      }
+    } catch (e: any) {
+        console.error("Failed to check employee count:", e);
+    }
+
+
     // 1) generate token + hash
     const token = crypto.randomBytes(24).toString("hex");
     const tokenHash = sha256(token);

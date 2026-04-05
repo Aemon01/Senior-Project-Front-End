@@ -130,10 +130,10 @@ export default function ActivityDashboard() {
           {participants.map((person) => (
             <div key={person.id} className={styles.participantItemRow}>
               <div className={styles.profileWrap}>
-                <Image 
-                  src={person.profileImage || "/images/avatar%20picture/default.png"} 
-                  alt="Avatar" width={50} height={50} 
-                  className={styles.avatarCircle} 
+                <Image
+                  src={person.profileImage || "/images/avatar%20picture/default.png"}
+                  alt="Avatar" width={50} height={50}
+                  className={styles.avatarCircle}
                 />
               </div>
               <div className={styles.participantMainInfo}>
