@@ -269,7 +269,7 @@ function limitAvatarOptions(options: AvatarOption[], selectedId: string | null, 
   return [...top.slice(0, limit - 1), selected];
 }
 
-function mapStudentToDashboard(api: DashboardApiResponse["data"]) {
+function mapStudentToDashboard(api: DashboardApiResponse["data"], statsData?: any) {
   const student = api?.student_info ?? {};
   const firstName = student.first_name?.trim() || "";
   const lastName = student.last_name?.trim() || "";
@@ -323,11 +323,24 @@ function mapStudentToDashboard(api: DashboardApiResponse["data"]) {
     avatarChoiceId: student.avatar_choice ?? null,
   };
 
-  const skills: Skill[] = skillsFromApi.map((name, index) => ({
-    id: `skill-${index}`,
-    name,
-    percent: toSkillPercent(name, index),
-  }));
+  let skills: Skill[] = [];
+  if (statsData?.skill_levels && statsData.skill_levels.length > 0) {
+    skills = statsData.skill_levels.map((s: any, i: number) => {
+      const skillLevel = parseInt(s.skill_level || "0", 10);
+      const pct = Math.min(100, Math.max(10, skillLevel * 15));
+      return {
+        id: s.skill_id || `s${i}`,
+        name: s.skill_name || "Unknown",
+        percent: pct,
+      };
+    });
+  } else {
+    skills = skillsFromApi.map((name, index) => ({
+      id: `skill-${index}`,
+      name,
+      percent: toSkillPercent(name, index),
+    }));
+  }
 
   const doneActivities: ActivityItem[] = Array.isArray(api?.done_activities)
     ? api!.done_activities!.map((item, index) => ({
@@ -340,7 +353,7 @@ function mapStudentToDashboard(api: DashboardApiResponse["data"]) {
     : [];
 
   const schedules: ScheduleItem[] = Array.isArray(api?.schedules)
-  ? api!.schedules!.map((item: any, index) => ({
+    ? api!.schedules!.map((item: any, index) => ({
       id: item.activity_id || `schedule-${index}`,
       title: item.activity_name || "Schedule",
       sub: item.activity_type || "Activity",
@@ -348,7 +361,7 @@ function mapStudentToDashboard(api: DashboardApiResponse["data"]) {
       endAt: item.end_at || "",
       calendarColor: normalizeScheduleColor(item.calendar_color),
     }))
-  : [];
+    : [];
 
   const missions: MissionItem[] = Array.isArray(api?.today_missions)
     ? api!.today_missions!.map((item, index) => ({
@@ -535,7 +548,7 @@ export default function ClientDashboard() {
         setLoading(true);
         setError(null);
 
-        const [dashboardRes, avatarRes] = await Promise.all([
+        const [dashboardRes, avatarRes, statsRes] = await Promise.all([
           fetch("/api/student", {
             method: "GET",
             credentials: "include",
@@ -546,15 +559,24 @@ export default function ClientDashboard() {
             credentials: "include",
             cache: "no-store",
           }).catch(() => null),
+          fetch("/api/student/activitystats", {
+            method: "GET",
+            credentials: "include",
+            cache: "no-store",
+          }).catch(() => null),
         ]);
 
         const json: DashboardApiResponse = await dashboardRes.json();
+        let statsJson: any = null;
+        if (statsRes && statsRes.ok) {
+          statsJson = await statsRes.json();
+        }
 
         if (!dashboardRes.ok || !json.ok || !json.data) {
           throw new Error(json?.message || "Failed to load dashboard");
         }
 
-        const mapped = mapStudentToDashboard(json.data);
+        const mapped = mapStudentToDashboard(json.data, statsJson?.data);
 
         let avatarOptions: AvatarOption[] = [];
         if (avatarRes && avatarRes.ok) {
