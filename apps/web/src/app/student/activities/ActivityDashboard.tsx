@@ -6,6 +6,7 @@ import Link from "next/link";
 import StudentCalendar, {
     type StudentCalendarSiteEvent,
 } from "@/components/shared/student/StudentCalendar";
+import AllActivities from "./overview/overview";
 
 type StatCard = {
     label: string;
@@ -191,17 +192,6 @@ export default function ActivityDashboard() {
         }));
     }, [data]);
 
-    const activities = useMemo(() => {
-        if (!data?.registered_activities || data.registered_activities.length === 0) return ACTIVITIES;
-        return data.registered_activities.map((a: any, i: number) => ({
-            id: a.ActivityID || `act-${i}`,
-            activity_name: a.ActivityName || "Activity",
-            difficulty: "Beginner",
-            activity_type: a.ActivityType || "Course",
-            hours: a.Hours,
-            status: a.Status === "Publish" ? "can join" : "pending"
-        }));
-    }, [data]);
     if (loading) {
         return (
             <div className={styles.dash}>
@@ -223,7 +213,7 @@ export default function ActivityDashboard() {
             <div className={styles.leftRail}>
                 <StatSummary stats={stats} />
                 <SkillProgressGraph skills={skills} />
-                <ActivityOverviewTable activities={activities} />
+                <AllActivities showBackButton={false} />
             </div>
 
             <div className={styles.rightRail}>
