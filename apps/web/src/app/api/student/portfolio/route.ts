@@ -435,10 +435,45 @@ export async function GET(req: Request) {
     const [portfolioJson, dashboardJson] = await Promise.all([
       tryFetchJson(`${BACKEND}/student/${stdId}/portfolio`, sess.accessToken),
       tryFetchJson(`${BACKEND}/student/${stdId}/dashboard`, sess.accessToken),
+      tryFetchJson(`${BACKEND}/student/${stdId}`, sess.accessToken),
     ]);
 
     const portfolioRoot = portfolioJson?.data ?? portfolioJson ?? {};
-    const dashboardRoot = dashboardJson?.data ?? dashboardJson ?? {};
+    // merge student base info into dashboardRoot.student_info
+    const studentBase = studentJson?.data ?? studentJson ?? {};
+    const studentInfo = studentBase?.student_info ?? studentBase ?? {};
+    const dashboardData = dashboardJson?.data ?? dashboardJson ?? {};
+    const dashboardRoot = {
+      ...dashboardData,
+      student_info: {
+        ...studentInfo,
+        ...(dashboardData?.student_info ?? {}),
+      },
+    };
+
+    const normalizedExperiences = normalizeExperiences(portfolioRoot);
+
+    // ถ้า portfolio ไม่มี experience เลย ให้ดึง done_activities จาก dashboard มาแสดงเป็น platform experience
+    const doneActivities: any[] = Array.isArray(dashboardData?.done_activities) ? dashboardData.done_activities : [];
+    const platformActivities = doneActivities
+      .filter((a: any) => a?.activity_name || a?.ActivityName)
+      .map((a: any, i: number) => ({
+        id: String(a?.activity_id ?? a?.ActivityID ?? `platform-exp-${i}`),
+        period: (() => {
+          const start = String(a?.start_at ?? a?.run_start_at ?? "").slice(0, 4);
+          const end = String(a?.end_at ?? a?.run_end_at ?? "").slice(0, 4);
+          return start && end && start !== end ? `${start} - ${end}` : start || end || "";
+        })(),
+        title: String(a?.activity_name ?? a?.ActivityName ?? ""),
+        description: String(a?.activity_detail ?? a?.description ?? ""),
+        source: "platform",
+        files: [],
+      }))
+      .filter((e: any) => e.title);
+
+    const finalExperiences = normalizedExperiences.length > 0
+      ? normalizedExperiences
+      : platformActivities;
 
     // console.log("portfolioRoot: ", portfolioRoot);
     // console.log("dashboardRoot: ", dashboardRoot);

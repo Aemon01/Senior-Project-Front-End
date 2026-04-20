@@ -182,6 +182,27 @@ function makeId(prefix: string) {
     return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+const PUBLIC_ASSET_BASE =
+    process.env.NEXT_PUBLIC_S3_PUBLIC_BASE_URL ||
+    process.env.NEXT_PUBLIC_ASSETS_PUBLIC_BASE ||
+    "https://vcep-assets-dev.s3.ap-southeast-2.amazonaws.com";
+
+function resolveImageUrl(value: string | null | undefined): string {
+    const raw = String(value ?? "").trim();
+    if (!raw) return "";
+    // already full URL
+    if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+    // s3:// scheme — strip bucket, use key
+    if (raw.startsWith("s3://")) {
+        const withoutScheme = raw.replace("s3://", "");
+        const slashIdx = withoutScheme.indexOf("/");
+        const key = slashIdx >= 0 ? withoutScheme.slice(slashIdx + 1) : "";
+        return key ? `${PUBLIC_ASSET_BASE.replace(/\/+$/, "")}/${key.replace(/^\/+/, "")}` : "";
+    }
+    // bare key (with or without leading slash)
+    return `${PUBLIC_ASSET_BASE.replace(/\/+$/, "")}/${raw.replace(/^\/+/, "")}`;
+}
+
 function getSourceIcon(source: ItemSource) {
     return source === "upload"
         ? "/images/icons/sign01-icon.png"
@@ -328,6 +349,7 @@ export default function PortfolioPage() {
     const [skills, setSkills] = useState<SkillItem[]>([]);
     const [certificates, setCertificates] = useState<CertificateItem[]>([]);
     const [experiences, setExperiences] = useState<ExperienceItem[]>([]);
+    const [apiPlatformExperiences, setApiPlatformExperiences] = useState<ExperienceItem[]>([]);
 
     // const [educationList, setEducationList] = useState([
     //     "Suankularb Wittayalai (2015 - 2021) (GPA: 3.99)",
@@ -446,6 +468,7 @@ export default function PortfolioPage() {
         birthInputRef.current?.focus();
     }
 
+    async function onPhotoChange(e: ChangeEvent<HTMLInputElement>) {
     async function onPhotoChange(e: ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -953,11 +976,11 @@ export default function PortfolioPage() {
             setLoadedForm(nextForm);
 
             setPhotoUrl(
-                String(
+                resolveImageUrl(
                     info.profile_image_url ||
                     info.avatar_image_url ||
                     ""
-                ).trim()
+                )
             );
 
             setEducationList(
@@ -1010,6 +1033,22 @@ export default function PortfolioPage() {
                         .filter((item: ExperienceItem) => item.title)
                     : []
             );
+
+            // platform activities from backend (completed activities)
+            if (Array.isArray(portfolio.platform_activities)) {
+                setApiPlatformExperiences(
+                    portfolio.platform_activities
+                        .map((item: any) => ({
+                            id: item.id || item.activity_id || makeId("platform-exp"),
+                            period: item.period || "",
+                            title: item.title || item.activity_name || item.name || "",
+                            description: item.description || "",
+                            source: "platform" as ItemSource,
+                            files: [],
+                        }))
+                        .filter((item: ExperienceItem) => item.title)
+                );
+            }
         } catch (error) {
             console.error("Failed to fetch portfolio:", error);
 
@@ -1489,11 +1528,16 @@ export default function PortfolioPage() {
                                 <div className={styles.sectionEditorGroup}>
                                     <div className={styles.sectionEditorHeading}>Select from platform</div>
                                     <div className={styles.optionList}>
-                                        {platformExperienceOptions.map((item) => (
+                                        {apiPlatformExperiences.length === 0 && (
+                                            <div className={styles.optionMeta} style={{ padding: "8px 0", color: "#8a827b" }}>
+                                                ยังไม่มีกิจกรรมที่เสร็จสมบูรณ์จากแพลตฟอร์ม
+                                            </div>
+                                        )}
+                                        {apiPlatformExperiences.map((item) => (
                                             <button key={item.id} type="button" className={styles.optionCardTall} onClick={() => onSelectPlatformExperience(item)}>
                                                 <img src={getSourceIcon("platform")} alt="Platform" className={styles.inlineSourceIcon} />
                                                 <div className={styles.optionTextBlock}>
-                                                    <div className={styles.optionTitle}>[{item.period}] - {item.title}</div>
+                                                    <div className={styles.optionTitle}>{item.period ? `[${item.period}] - ` : ""}{item.title}</div>
                                                     <div className={styles.optionMeta}>{item.description}</div>
                                                 </div>
                                             </button>
