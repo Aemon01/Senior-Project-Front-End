@@ -13,7 +13,13 @@ import StudentCalendar, {
 /* =======================
    Types
 ======================= */
-type Skill = { id: string; name: string; percent: number };
+type Skill = {
+  id: string;
+  name: string;
+  level: number;
+  bloomPhase: string;
+  fillPercent: number;
+};
 
 type ActivityStatusKey =
   | "completed"
@@ -167,6 +173,13 @@ type ActivityStatsResponse = {
       Hours?: number | string;
       hours?: number | string;
     }>;
+    skill_levels?: Array<{
+      skill_id?: string;
+      skill_name?: string;
+      skill_level?: number | string;
+      bloom_level?: number | string;
+      level?: number | string;
+    }>;
   };
   message?: string;
 };
@@ -190,6 +203,15 @@ const BADGE_TILES: Array<{ id: TileId; label: string; image: string; alt: string
   { id: "certificate", label: "certificate", image: "/images/icons/porttfolio-icon.png", alt: "Certificate" },
   { id: "portfolio", label: "portfolio", image: "/images/icons/porttfolio-icon.png", alt: "Portfolio" },
 ];
+
+const BLOOM_PHASE_LABELS: Record<number, string> = {
+  1: "Remember",
+  2: "Understand",
+  3: "Apply",
+  4: "Analyze",
+  5: "Evaluate",
+  6: "Create",
+};
 
 /* =======================
    Helpers
@@ -340,6 +362,49 @@ function mapOverviewActivities(statsData?: ActivityStatsResponse["data"]): Activ
       hours: Number(item?.Hours ?? item?.hours ?? 0),
       status: normalizeOverviewStatus(getActivityStatusForStats(item)),
       detailPath: getActivityDetailPath(type),
+    };
+  });
+}
+
+function buildSkillProgressFromStats(
+  statsData?: ActivityStatsResponse["data"],
+  fallbackSkillNames: string[] = []
+): Skill[] {
+  const rawSkillLevels: any[] = Array.isArray(statsData?.skill_levels)
+    ? statsData!.skill_levels!
+    : [];
+
+  if (rawSkillLevels.length > 0) {
+    return rawSkillLevels.map((skill: any, index: number) => {
+      const rawLevel = Number(
+        skill?.skill_level ?? skill?.bloom_level ?? skill?.level ?? 1
+      );
+
+      const safeLevel = Number.isFinite(rawLevel) ? rawLevel : 1;
+      const level = Math.min(6, Math.max(1, Math.round(safeLevel)));
+
+      return {
+        id: String(skill?.skill_id || `skill-${index}`),
+        name: String(skill?.skill_name || "Unknown"),
+        level,
+        bloomPhase: BLOOM_PHASE_LABELS[level] || "Unknown",
+        fillPercent: (level / 6) * 100,
+      };
+    });
+  }
+
+  return fallbackSkillNames.map((name, index) => {
+    const level = Math.min(
+      6,
+      Math.max(1, Math.round((toSkillPercent(name, index) / 100) * 6))
+    );
+
+    return {
+      id: `skill-${index}`,
+      name,
+      level,
+      bloomPhase: BLOOM_PHASE_LABELS[level] || "Unknown",
+      fillPercent: (level / 6) * 100,
     };
   });
 }
@@ -543,11 +608,7 @@ function mapStudentToDashboard(api: DashboardApiResponse["data"]) {
     avatarChoiceId: student.avatar_choice ?? null,
   };
 
-  const skills: Skill[] = skillsFromApi.map((name, index) => ({
-    id: `skill-${index}`,
-    name,
-    percent: toSkillPercent(name, index),
-  }));
+  const skills: Skill[] = buildSkillProgressFromStats(undefined, skillsFromApi);
 
   const doneActivities: ActivityItem[] = Array.isArray(api?.done_activities)
     ? api!.done_activities!.map((item, index) => {
@@ -788,6 +849,7 @@ export default function ClientDashboard() {
 
         const mapped = mapStudentToDashboard(json.data);
 
+        let mappedSkills: Skill[] = mapped.skills;
         let mappedOverviewActivities: ActivityItem[] = mapped.doneActivities;
         let mappedCompletionSegments: CompletionSegment[] = mapped.completionSegments;
 
@@ -796,6 +858,10 @@ export default function ClientDashboard() {
             await activityStatsRes.json().catch(() => null);
 
           if (activityStatsJson?.ok) {
+            mappedSkills = buildSkillProgressFromStats(
+              activityStatsJson.data,
+              mapped.me.skill
+            );
             mappedOverviewActivities = mapOverviewActivities(activityStatsJson.data);
             mappedCompletionSegments = buildCompletionSegmentsFromStats(
               activityStatsJson.data,
@@ -837,7 +903,7 @@ export default function ClientDashboard() {
               }
               : mapped.me
           );
-          setSkills(mapped.skills);
+          setSkills(mappedSkills);
           setDoneActivities(mapped.doneActivities);
           setOverviewActivities(mappedOverviewActivities);
           setSchedules(mapped.schedules);
@@ -1497,48 +1563,55 @@ function MidRow({
         </div>
 
         <div className={styles.skillViewport}>
-          <div
-            className={styles.skillScroll}
-            role="region"
-            aria-label="Skill progress list"
-          >
-            <div className={styles.skillRow}>
-              {skills.length > 0 ? (
-                skills.map((s, i) => (
-                  <div key={s.id} className={styles.skillCol}>
-                    <div className={styles.skillPct}>{s.percent}%</div>
+          {skills.length === 0 ? (
+            <div style={{ padding: "20px 0", fontSize: 13, color: "#888" }}>
+              No skill progress data yet.
+            </div>
+          ) : (
+            <div
+              className={styles.skillScroll}
+              role="region"
+              aria-label="Skill progress list"
+            >
+              <div className={styles.skillRow}>
+                {skills.map((skill, i) => (
+                  <div key={skill.id} className={styles.skillCol}>
+                    <div className={styles.skillPct}>Level {skill.level}</div>
+                    <div className={styles.skillPhase}>{skill.bloomPhase}</div>
 
                     <div className={styles.skillTube}>
                       <div
                         className={cx(
                           styles.skillFill,
-                          i === 0 && styles.trackGreenWide,
-                          i === 1 && styles.trackPink,
-                          i === 2 && styles.trackYellow,
-                          i === 3 && styles.trackGreen,
-                          i === 4 && styles.trackSoftPink,
-                          i === 5 && styles.trackBlue,
-                          i === 6 && styles.trackOrange,
-                          i === 7 && styles.trackRose,
-                          i === 8 && styles.trackSoftPink,
-                          i === 9 && styles.trackBlue,
-                          i === 10 && styles.trackOrange,
-                          i === 11 && styles.trackRose
+                          i % 16 === 0 && styles.trackGreenWide,
+                          i % 16 === 1 && styles.trackPink,
+                          i % 16 === 2 && styles.trackYellow,
+                          i % 16 === 3 && styles.trackGreen,
+                          i % 16 === 4 && styles.trackSoftPink,
+                          i % 16 === 5 && styles.trackBlue,
+                          i % 16 === 6 && styles.trackOrange,
+                          i % 16 === 7 && styles.trackRose,
+                          i % 16 === 8 && styles.trackSoftPink,
+                          i % 16 === 9 && styles.trackBlue,
+                          i % 16 === 10 && styles.trackOrange,
+                          i % 16 === 11 && styles.trackRose,
+                          i % 16 === 12 && styles.trackSoftPink,
+                          i % 16 === 13 && styles.trackBlue,
+                          i % 16 === 14 && styles.trackOrange,
+                          i % 16 === 15 && styles.trackRose
                         )}
-                        style={{ height: `${s.percent}%` }}
+                        style={{ height: `${skill.fillPercent}%` }}
                       />
                     </div>
 
-                    <div className={styles.skillLabel} title={s.name}>
-                      {s.name}
+                    <div className={styles.skillLabel} title={skill.name}>
+                      {skill.name}
                     </div>
                   </div>
-                ))
-              ) : (
-                <div style={{ padding: 16 }}>No skills</div>
-              )}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </section>
     </div>

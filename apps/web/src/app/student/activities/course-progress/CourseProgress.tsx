@@ -1,5 +1,22 @@
 "use client";
 
+function toYoutubeEmbedUrl(url: string): string {
+  if (!url?.trim()) return url;
+  // embed อยู่แล้ว → เปลี่ยนเป็น nocookie
+  const embedMatch = url.match(/(?:youtube\.com|youtube-nocookie\.com)\/embed\/([a-zA-Z0-9_-]{11})/);
+  if (embedMatch) return `https://www.youtube-nocookie.com/embed/${embedMatch[1]}?rel=0`;
+  // watch?v=
+  const watchMatch = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  if (watchMatch) return `https://www.youtube-nocookie.com/embed/${watchMatch[1]}?rel=0`;
+  // youtu.be/
+  const shortMatch = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  if (shortMatch) return `https://www.youtube-nocookie.com/embed/${shortMatch[1]}?rel=0`;
+  // shorts/
+  const shortsMatch = url.match(/\/shorts\/([a-zA-Z0-9_-]{11})/);
+  if (shortsMatch) return `https://www.youtube-nocookie.com/embed/${shortsMatch[1]}?rel=0`;
+  return url;
+}
+
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState, useEffect, useCallback, Suspense } from "react";
 import styles from "./page.module.css";
@@ -225,7 +242,7 @@ function LessonViewer({
             <iframe
               width="100%"
               height="280"
-              src={lessonData?.data}
+              src={toYoutubeEmbedUrl(lessonData?.data ?? "")}
               title={lessonData?.title ?? "Video"}
               frameBorder="0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"

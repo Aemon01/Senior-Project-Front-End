@@ -500,12 +500,10 @@ function ActivityStatusSection({
       <div className={styles.actionGrid}>
         <button
           type="button"
-          className={`${styles.actionButton} ${
-            selectedStatus === "draft"
-              ? styles.statusButtonActive
-              : styles.statusButtonInactive
-          }`}
-          onClick={() => onSelectStatus("draft")}
+          className={`${styles.actionButton} ${styles.statusButtonInactive}`}
+          disabled
+          aria-disabled="true"
+          style={{ cursor: "not-allowed", opacity: 0.45 }}
         >
           <Image
             src="/images/icons/draft-icon.png"
@@ -519,11 +517,7 @@ function ActivityStatusSection({
 
         <button
           type="button"
-          className={`${styles.actionButton} ${
-            selectedStatus === "publish"
-              ? styles.statusButtonActive
-              : styles.statusButtonInactive
-          }`}
+          className={`${styles.actionButton} ${styles.statusButtonActive}`}
           onClick={() => onSelectStatus("publish")}
         >
           <Image
@@ -580,7 +574,7 @@ function AddSkillModal({
         const category = skill.skillCategory.toLowerCase();
         return name.includes(keyword) || category.includes(keyword);
       })
-      .slice(0, 10);
+      .slice(0, keyword ? 50 : 200);
   }, [availableSkills, formValue.searchText, selectedSkillIds]);
 
   if (!isOpen) return null;
@@ -1412,7 +1406,7 @@ function AccessAndScheduleSection({
   onEnrollmentRangeChange,
   onActivityRangeChange,
   defaultMaxParticipants = FORM_DEFAULTS.maxParticipants,
-  defaultIsUnlimited = true,
+  defaultIsUnlimited = false,
   defaultEnrollmentRange,
   defaultActivityRange,
 }: {
@@ -1429,7 +1423,7 @@ function AccessAndScheduleSection({
   defaultEnrollmentRange?: RangeValue;
   defaultActivityRange?: RangeValue;
 }) {
-  const [isUnlimited, setIsUnlimited] = useState(defaultIsUnlimited);
+  const [isUnlimited, setIsUnlimited] = useState(false);
 
   const enrollDefault = defaultEnrollmentRange ?? {
     startDate: FORM_DEFAULTS.enrollmentStartDate,
@@ -1445,8 +1439,9 @@ function AccessAndScheduleSection({
   };
 
   useEffect(() => {
-    setIsUnlimited(defaultIsUnlimited);
-  }, [defaultIsUnlimited]);
+    setIsUnlimited(false);
+    onIsUnlimitedChange(false);
+  }, [defaultIsUnlimited, onIsUnlimitedChange]);
 
   return (
     <SectionCard className={styles.settingsPanel}>
@@ -1492,21 +1487,17 @@ function AccessAndScheduleSection({
             ref={maxParticipantsRef}
             className={styles.maxParticipantInput}
             defaultValue={defaultMaxParticipants}
-            disabled={isUnlimited}
           />
         </div>
 
         <button
           type="button"
           className={styles.unlimitedToggle}
-          onClick={() => {
-            setIsUnlimited((previous) => {
-              onIsUnlimitedChange(!previous);
-              return !previous;
-            });
-          }}
+          disabled
+          aria-disabled="true"
+          style={{ cursor: "not-allowed", opacity: 0.45 }}
         >
-          <CheckBoxIcon checked={isUnlimited} />
+          <CheckBoxIcon checked={false} />
           <span>No</span>
         </button>
       </div>
@@ -1548,7 +1539,7 @@ export default function ActivityChallenge() {
 
   // UI state
   const [selectedActivityType, setSelectedActivityType] = useState<ActivityKind>("challenges");
-  const [selectedActivityStatus, setSelectedActivityStatus] = useState<ActivityStatus>("draft");
+  const [selectedActivityStatus, setSelectedActivityStatus] = useState<ActivityStatus>("publish");
   const [selectedAudience, setSelectedAudience] = useState<AudienceAccess>("everyone");
   const [selectedParticipation, setSelectedParticipation] = useState<ParticipationMode>("scheduledParticipation");
   const [selectedLevel, setSelectedLevel] = useState<ChallengeLevel>("advanced");
@@ -1626,8 +1617,7 @@ export default function ActivityChallenge() {
         isUnlimitedRef.current = maxP === 0;
         skillItemsRef.current = normalizedSkillItems;
 
-        const statusVal = String(info?.activity_status ?? info?.status ?? raw?.activity_status ?? raw?.status ?? "draft");
-        setSelectedActivityStatus(statusVal === "published" ? "publish" : "draft");
+        setSelectedActivityStatus("publish");
 
         const visVal = String(info?.activity_visibility ?? info?.visibility ?? raw?.activity_visibility ?? raw?.visibility ?? "public");
         setSelectedAudience(visVal === "invited" ? "invitedOnly" : "everyone");
@@ -1723,7 +1713,7 @@ export default function ActivityChallenge() {
         activity_name: activityTitle,
         activity_detail: descriptionRef.current?.value?.trim() || "",
         activity_type: "challenge",
-        status: selectedActivityStatus === "publish" ? "published" : "draft",
+        status: "published",
         visibility: selectedAudience === "everyone" ? "public" : "invited",
         is_open_ended: selectedParticipation === "joinAnytime",
         max_participants: maxPart,
@@ -1916,11 +1906,7 @@ export default function ActivityChallenge() {
               transition: "background 0.2s",
             }}
           >
-            {isSubmitting
-              ? "Saving..."
-              : selectedActivityStatus === "publish"
-              ? "Publish Activity"
-              : "Save as Draft"}
+            {isSubmitting ? "Saving..." : "Publish Activity"}
           </button>
         </div>
       </div>
