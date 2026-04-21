@@ -360,7 +360,7 @@ function OrgBuildingLabel({ meshNames, orgName }: { meshNames: string[]; orgName
     if (!points.length) return null;
 
     const center = points.reduce((acc, point) => acc.add(point), new THREE.Vector3()).divideScalar(points.length);
-    return center.clone().setY(center.y + 16);
+    return center.clone().setY(center.y + 7);
   }, [scene, meshNames]);
 
   if (!labelPos) return null;
@@ -391,7 +391,7 @@ function OrgBuildingLabel({ meshNames, orgName }: { meshNames: string[]; orgName
             position: "absolute",
             left: "50%",
             transform: "translateX(-50%)",
-            bottom: -10,
+            bottom: -20,
             width: 0,
             height: 0,
             borderLeft: "8px solid transparent",

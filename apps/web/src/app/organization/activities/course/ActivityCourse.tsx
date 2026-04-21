@@ -586,7 +586,7 @@ function AddSkillModal({
     const keyword = formValue.searchText.trim().toLowerCase();
 
     if (!keyword) {
-      return availableSkills.slice(0, 10);
+      return availableSkills.slice(0, 200);
     }
 
     return availableSkills
@@ -595,7 +595,7 @@ function AddSkillModal({
         const category = skill.skillCategory.toLowerCase();
         return name.includes(keyword) || category.includes(keyword);
       })
-      .slice(0, 10);
+      .slice(0, 50);
   }, [availableSkills, formValue.searchText]);
 
   if (!isOpen) return null;
@@ -1412,7 +1412,7 @@ function AccessAndScheduleSection({
   activityRange: RangeValue;
   onActivityRangeChange: (value: RangeValue) => void;
 }) {
-  const [isUnlimited, setIsUnlimited] = useState(true);
+  const isUnlimited = false;
 
   return (
     <SectionCard className={styles.settingsPanel}>
@@ -1451,7 +1451,7 @@ function AccessAndScheduleSection({
             <label className={styles.maxParticipantLabel}>Max Participants</label>
             <input
               className={styles.maxParticipantInput}
-              value={isUnlimited ? "0" : maxParticipants}
+              value={maxParticipants}
               onChange={(e) => onMaxParticipantsChange(e.target.value)}
               disabled={isUnlimited}
               type="number"
@@ -1462,7 +1462,8 @@ function AccessAndScheduleSection({
           <button
             type="button"
             className={styles.unlimitedToggle}
-            onClick={() => setIsUnlimited((previous) => !previous)}
+            disabled
+            style={{ cursor: "not-allowed", opacity: 0.5 }}
           >
             <CheckBoxIcon checked={isUnlimited} />
             <span>No</span>
@@ -1911,7 +1912,7 @@ export default function ActivityCourse() {
   const [selectedActivityType, setSelectedActivityType] =
     useState<ActivityKind>("courses");
   const [selectedActivityStatus, setSelectedActivityStatus] =
-    useState<ActivityStatus>("draft");
+    useState<ActivityStatus>("publish");
   const [selectedAudience, setSelectedAudience] =
     useState<AudienceAccess>("everyone");
   const [selectedParticipation, setSelectedParticipation] =
@@ -1921,7 +1922,7 @@ export default function ActivityCourse() {
   const [activityTitle, setActivityTitle] = useState("");
   const [description, setDescription] = useState("");
   const [hours, setHours] = useState("");
-  const [maxParticipants, setMaxParticipants] = useState("0");
+  const [maxParticipants, setMaxParticipants] = useState(FORM_DEFAULTS.maxParticipants);
 
   // Skills lifted from SkillsAndRewardsSection
   const [skillItems, setSkillItems] = useState<SkillProgressItem[]>([]);

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, Suspense } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import styles from "./page.module.css";
 import { useRouter } from "next/navigation";
 
@@ -25,7 +25,13 @@ const NAV_ITEMS = [
   { label: "Register", href: "/auth/register" },
 ];
 
-function NormalizedBuilding({ url, sizeBoost = 1 }: { url: string; sizeBoost?: number }) {
+function NormalizedBuilding({
+  url,
+  sizeBoost = 1,
+}: {
+  url: string;
+  sizeBoost?: number;
+}) {
   const { scene } = useGLTF(url);
 
   const normalized = useMemo(() => {
@@ -59,7 +65,13 @@ function NormalizedBuilding({ url, sizeBoost = 1 }: { url: string; sizeBoost?: n
   return <primitive object={normalized} />;
 }
 
-function StaticBuildingScene({ url, sizeBoost = 1 }: { url: string; sizeBoost?: number }) {
+function StaticBuildingScene({
+  url,
+  sizeBoost = 1,
+}: {
+  url: string;
+  sizeBoost?: number;
+}) {
   const yOffset = sizeBoost >= 1.4 ? -1.16 : sizeBoost >= 1.2 ? -1.02 : -0.82;
 
   return (
@@ -107,12 +119,51 @@ function BuildingViewer({
   );
 }
 
+async function fileToResizedDataUrl(file: File): Promise<string> {
+  if (!file.type.startsWith("image/")) {
+    throw new Error("Logo file must be an image");
+  }
+
+  const imageUrl = URL.createObjectURL(file);
+
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("Failed to read logo image"));
+      img.src = imageUrl;
+    });
+
+    const maxSide = 512;
+    const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight, 1));
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      throw new Error("Failed to prepare logo image");
+    }
+
+    ctx.clearRect(0, 0, width, height);
+    ctx.drawImage(image, 0, 0, width, height);
+
+    return canvas.toDataURL("image/png");
+  } finally {
+    URL.revokeObjectURL(imageUrl);
+  }
+}
+
 export default function FillMoreInfoOrgPage() {
   const router = useRouter();
   const [buildings, setBuildings] = useState<BuildingOption[]>([]);
   const [buildingIndex, setBuildingIndex] = useState(0);
   const [buildingError, setBuildingError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [logoObjectUrl, setLogoObjectUrl] = useState("");
 
   const [form, setForm] = useState({
     orgName: "",
@@ -121,6 +172,7 @@ export default function FillMoreInfoOrgPage() {
     location: "",
     aboutUs: "",
     logoFile: null as File | null,
+    logoPreview: "",
     email: "",
     phone: "",
     website: "",
@@ -133,6 +185,7 @@ export default function FillMoreInfoOrgPage() {
   });
 
   const selectedBuilding = buildings[buildingIndex] ?? null;
+  const displayLogoSrc = logoObjectUrl || form.logoPreview;
 
   const selectedBuildingBoost = useMemo(() => {
     const source = `${selectedBuilding?.name ?? ""} ${selectedBuilding?.modelUrl ?? ""}`.toLowerCase();
@@ -140,14 +193,16 @@ export default function FillMoreInfoOrgPage() {
       source.includes("building a") ||
       source.includes("typea") ||
       source.includes("building-model-typea")
-    )
+    ) {
       return 1.42;
+    }
     if (
       source.includes("building b") ||
       source.includes("typeb") ||
       source.includes("building-model-typeb")
-    )
+    ) {
       return 1.38;
+    }
     return 1;
   }, [selectedBuilding]);
 
@@ -156,7 +211,9 @@ export default function FillMoreInfoOrgPage() {
     const safeIndex = ((index % buildings.length) + buildings.length) % buildings.length;
     const picked = buildings[safeIndex];
     setBuildingIndex(safeIndex);
-    setForm((prev) => (prev.buildingId === picked.id ? prev : { ...prev, buildingId: picked.id }));
+    setForm((prev) =>
+      prev.buildingId === picked.id ? prev : { ...prev, buildingId: picked.id }
+    );
   };
 
   const loadPageData = async () => {
@@ -199,6 +256,8 @@ export default function FillMoreInfoOrgPage() {
         businessType: org.businessType || "",
         location: org.location || "",
         aboutUs: org.aboutUs || "",
+        logoPreview: org.logoPreview || "",
+        logoFile: null,
         email: org.email || "",
         phone: org.phone || "",
         website: org.website || "",
@@ -212,7 +271,9 @@ export default function FillMoreInfoOrgPage() {
     }
 
     if (currentOrgBuildingId && nextBuildings.length > 0) {
-      const currentIndex = nextBuildings.findIndex((building) => building.id === currentOrgBuildingId);
+      const currentIndex = nextBuildings.findIndex(
+        (building) => building.id === currentOrgBuildingId
+      );
       if (currentIndex >= 0) {
         setBuildingIndex(currentIndex);
         setForm((prev) => ({ ...prev, buildingId: currentOrgBuildingId }));
@@ -253,9 +314,17 @@ export default function FillMoreInfoOrgPage() {
   }, []);
 
   useEffect(() => {
-    if (!form.logoFile) return;
+    if (!form.logoFile) {
+      setLogoObjectUrl("");
+      return;
+    }
+
     const url = URL.createObjectURL(form.logoFile);
-    return () => URL.revokeObjectURL(url);
+    setLogoObjectUrl(url);
+
+    return () => {
+      URL.revokeObjectURL(url);
+    };
   }, [form.logoFile]);
 
   const prevBuilding = () => selectBuildingAt(buildingIndex - 1);
@@ -273,6 +342,8 @@ export default function FillMoreInfoOrgPage() {
 
     setSaving(true);
     try {
+      const logo = form.logoFile ? await fileToResizedDataUrl(form.logoFile) : undefined;
+
       const res = await fetch("/api/organization", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -291,6 +362,7 @@ export default function FillMoreInfoOrgPage() {
           youtube: form.youtube,
           tiktok: form.tiktok,
           buildingId: form.buildingId,
+          ...(logo ? { logo } : {}),
         }),
       });
 
@@ -316,6 +388,8 @@ export default function FillMoreInfoOrgPage() {
           ? `/auth/fill-more-info/organization/employee?orgId=${encodeURIComponent(orgId)}`
           : "/auth/fill-more-info/organization/employee"
       );
+    } catch (error: any) {
+      alert(error?.message || "Failed to save organization");
     } finally {
       setSaving(false);
     }
@@ -395,15 +469,24 @@ export default function FillMoreInfoOrgPage() {
                       type="file"
                       accept="image/*"
                       className={styles.fileInput}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] ?? null;
                         setForm((p) => ({
                           ...p,
-                          logoFile: e.target.files?.[0] ?? null,
-                        }))
-                      }
+                          logoFile: file,
+                        }));
+                      }}
                     />
                     <div className={styles.logoDropInner}>
-                      <div className={styles.uploadText}>upload</div>
+                      {displayLogoSrc ? (
+                        <img
+                          src={displayLogoSrc}
+                          alt="Organization logo preview"
+                          className={styles.logoPreviewImg}
+                        />
+                      ) : (
+                        <div className={styles.uploadText}>upload</div>
+                      )}
                     </div>
                   </label>
                 </div>
@@ -512,7 +595,12 @@ export default function FillMoreInfoOrgPage() {
             </button>
           </div>
 
-          <button className={styles.nextBtn} type="button" onClick={saveOrganization} disabled={saving}>
+          <button
+            className={styles.nextBtn}
+            type="button"
+            onClick={saveOrganization}
+            disabled={saving}
+          >
             {saving ? "Saving..." : "Next"}
           </button>
         </section>
