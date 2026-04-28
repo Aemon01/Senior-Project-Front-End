@@ -570,7 +570,7 @@ function limitAvatarOptions(options: AvatarOption[], selectedId: string | null, 
   return [...top.slice(0, limit - 1), selected];
 }
 
-function mapStudentToDashboard(api: DashboardApiResponse["data"], statsData?: any) {
+function mapStudentToDashboard(api: DashboardApiResponse["data"]) {
   const student = api?.student_info ?? {};
   const firstName = student.first_name?.trim() || "";
   const lastName = student.last_name?.trim() || "";
@@ -650,7 +650,6 @@ function mapStudentToDashboard(api: DashboardApiResponse["data"], statsData?: an
 
   const schedules: ScheduleItem[] = Array.isArray(api?.schedules)
     ? api!.schedules!.map((item: any, index) => ({
-    ? api!.schedules!.map((item: any, index) => ({
       id: item.activity_id || `schedule-${index}`,
       title: item.activity_name || "Schedule",
       sub: item.activity_type || "Activity",
@@ -658,7 +657,6 @@ function mapStudentToDashboard(api: DashboardApiResponse["data"], statsData?: an
       endAt: item.end_at || "",
       calendarColor: normalizeScheduleColor(item.calendar_color),
     }))
-    : [];
     : [];
 
   const missions: MissionItem[] = Array.isArray(api?.today_missions)
@@ -856,7 +854,7 @@ export default function ClientDashboard() {
         setLoading(true);
         setError(null);
 
-        const [dashboardRes, avatarRes, statsRes, portfolioRes] = await Promise.all([
+        const [dashboardRes, activityStatsRes, avatarRes] = await Promise.all([
           fetch("/api/student", {
             method: "GET",
             credentials: "include",
@@ -872,23 +870,9 @@ export default function ClientDashboard() {
             credentials: "include",
             cache: "no-store",
           }).catch(() => null),
-          fetch("/api/student/activitystats", {
-            method: "GET",
-            credentials: "include",
-            cache: "no-store",
-          }).catch(() => null),
-          fetch("/api/student/portfolio", {
-            method: "GET",
-            credentials: "include",
-            cache: "no-store",
-          }).catch(() => null),
         ]);
 
         const json: DashboardApiResponse = await dashboardRes.json();
-        let statsJson: any = null;
-        if (statsRes && statsRes.ok) {
-          statsJson = await statsRes.json();
-        }
 
         if (!dashboardRes.ok || !json.ok || !json.data) {
           throw new Error(json?.message || "Failed to load dashboard");
@@ -931,27 +915,6 @@ export default function ClientDashboard() {
               name: "Current avatar",
             },
           ];
-        }
-
-        if (portfolioRes && portfolioRes.ok) {
-          try {
-            const portfolioJson = await portfolioRes.json();
-            const certs: any[] = Array.isArray(portfolioJson?.data?.certificates)
-              ? portfolioJson.data.certificates
-              : [];
-            setPortfolioCerts(
-              certs
-                .filter((c) => c.itemType !== "badge" && c.title)
-                .map((c, i) => ({ id: c.id || `cert-${i}`, title: c.title, badgeLink: c.badgeLink || "" }))
-            );
-            setPortfolioBadges(
-              certs
-                .filter((c) => c.itemType === "badge" && c.title)
-                .map((c, i) => ({ id: c.id || `badge-${i}`, title: c.title, badgeLink: c.badgeLink || "" }))
-            );
-          } catch {
-            // portfolio load failure is non-critical
-          }
         }
 
         const limitedAvatarOptions = limitAvatarOptions(avatarOptions, mapped.me.avatarChoiceId, 3);
@@ -2633,15 +2596,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function GridModal({
-  title,
-  items,
-  onClose,
-}: {
-  title: string;
-  items: Array<{ id: string; title: string; badgeLink: string }>;
-  onClose: () => void;
-}) {
+function GridModal({ title, count, onClose }: { title: string; count: number; onClose: () => void }) {
   return (
     <ModalShell
       title={title}
