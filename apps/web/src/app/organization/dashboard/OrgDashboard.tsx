@@ -86,78 +86,66 @@ type OrgActivityRow = {
     status: string;
     statusLabel: string;
     statusTone: ActivityStatusTone;
+    createdAt: string;
 };
 
-const PARTICIPANT_BARS: GraphBar[] = [
-    { label: "Chulalongkorn\nUniversity", value: 45 },
-    { label: "Thammasat\nUniversity", value: 78 },
-    { label: "Kasetsart\nUniversity", value: 52 },
-    { label: "KMUTNB", value: 34 },
-    { label: "Mahidol\nUniversity", value: 48 },
-    { label: "KMUTNB", value: 67 },
-    { label: "BU", value: 55 },
-];
 
-const SKILL_BARS: GraphBar[] = [
-    { label: "Data", value: 5 },
-    { label: "Communication", value: 11 },
-    { label: "UX/UI", value: 6 },
-    { label: "Frontend", value: 9 },
-    { label: "Backend", value: 8 },
-];
 
-const PARTICIPANTS = [
-    {
-        id: "p1",
-        name: "Charlotte Garcia",
-        subtitle: "Dedicated professional in marketing. Bringing fresh perspectives and committed to creating impact through thoughtful collaboration.",
-        score: 45,
-        avatarBg: "#f1d6d8",
-        initials: "CG",
-        level: 0,
-        profileImage: "",
-    },
-    {
-        id: "p2",
-        name: "Emma Williams",
-        subtitle: "Creative direction focused on lively ideas and execution. Committed to crafting work that feels clear, polished, and memorable.",
-        score: 45,
-        avatarBg: "#efd0bf",
-        initials: "EW",
-        level: 0,
-        profileImage: "",
-    },
-    {
-        id: "p3",
-        name: "James Taylor",
-        subtitle: "Results-driven professional in business development with a track record of success. Committed to building impactful solutions.",
-        score: 43,
-        avatarBg: "#c7dce7",
-        initials: "JT",
-        level: 0,
-        profileImage: "",
-    },
-    {
-        id: "p4",
-        name: "Alexander Davis",
-        subtitle: "Dedicated product perspective with strong collaboration skills and a practical approach to improving team outcomes.",
-        score: 42,
-        avatarBg: "#e5d7c8",
-        initials: "AD",
-        level: 0,
-        profileImage: "",
-    },
-    {
-        id: "p5",
-        name: "Olivia Davis",
-        subtitle: "Ideas powered by collaboration and clarity. Focused on thoughtful problem solving and steady professional growth.",
-        score: 41,
-        avatarBg: "#d8e7f1",
-        initials: "OD",
-        level: 0,
-        profileImage: "",
-    },
-];
+
+type ParticipantItem = {
+    id: string;
+    name: string;
+    subtitle: string;
+    score: number;
+    avatarBg: string;
+    initials: string;
+    level: number;
+    profileImage: string;
+};
+
+type ParticipantPortfolioData = {
+    studentInfo: {
+        firstName: string;
+        lastName: string;
+        phone: string;
+        email: string;
+        address: string;
+        aboutMe: string;
+        profileImageUrl: string;
+    };
+    education: Array<{
+        id: string;
+        school: string;
+        degree: string;
+        faculty: string;
+        fieldOfStudy: string;
+        startYear: string;
+        endYear: string;
+        gpa: string;
+    }>;
+    skills: Array<{
+        id: string;
+        name: string;
+        kind: "soft" | "technical";
+        source: "upload" | "platform";
+        isSelected: boolean;
+    }>;
+    certificates: Array<{
+        id: string;
+        title: string;
+        date: string;
+        itemType: "certificate" | "badge";
+        source: "upload" | "platform";
+        isSelected: boolean;
+    }>;
+    experiences: Array<{
+        id: string;
+        period: string;
+        title: string;
+        description: string;
+        source: "upload" | "platform";
+    }>;
+};
 
 const LEVEL_BADGES = [
     "/images/icons/badge01.png",
@@ -174,18 +162,19 @@ function getLevelBadgeSrc(level: number): string {
     return index >= 0 ? LEVEL_BADGES[index] : "/images/icons/badge01-icon.png";
 }
 
-const MONTH_DONUT_LABELS = [
-    { label: "Jan", value: 3 },
-    { label: "Feb", value: 5 },
-    { label: "Mar", value: 4 },
-    { label: "Apr", value: 6 },
-];
+function getPortfolioSourceIcon(source: "upload" | "platform") {
+    return source === "upload"
+        ? "/images/icons/sign01-icon.png"
+        : "/images/icons/sign02-icon.png";
+}
 
-const TYPE_DONUT_LABELS = [
-    { label: "Meetings", value: 4 },
-    { label: "Courses", value: 8 },
-    { label: "Challenges", value: 3 },
-];
+function getPortfolioSourceLabel(source: "upload" | "platform") {
+    return source === "upload" ? "Uploaded by user" : "Platform";
+}
+
+
+
+
 
 
 // ─── Employee Avatar Viewer ───────────────────────────────────────────────────
@@ -405,10 +394,37 @@ export default function OrgDashboardPage() {
 
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [building, setBuilding] = useState<{ buildingId: string; buildingName: string; modelUrl: string | null; previewUrl: string | null } | null>(null);
-    const [participantRows, setParticipantRows] = useState<typeof PARTICIPANTS>([]);
+    const [participantRows, setParticipantRows] = useState<ParticipantItem[]>([]);
     const [activityRows, setActivityRows] = useState<OrgActivityRow[]>([]);
     const [participantBars, setParticipantBars] = useState<GraphBar[]>([]);
     const [skillBars, setSkillBars] = useState<GraphBar[]>([]);
+
+    // ── Computed: By-month distribution from activityRows.createdAt ──
+    const monthDonutData = useMemo((): GraphBar[] => {
+        const counts: Record<string, number> = {};
+        const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        for (const act of activityRows) {
+            if (!act.createdAt) continue;
+            const d = new Date(act.createdAt);
+            if (isNaN(d.getTime())) continue;
+            const key = monthNames[d.getMonth()];
+            counts[key] = (counts[key] ?? 0) + 1;
+        }
+        // order by calendar month
+        return monthNames.filter((m) => counts[m]).map((m) => ({ label: m, value: counts[m] }));
+    }, [activityRows]);
+
+    // ── Computed: Activity-type donut ──
+    const typeDonutData = useMemo((): Array<{ label: string; value: number; color: string }> => {
+        const colors: Record<string, string> = { Meetings: "#66bdce", Courses: "#a8dcb3", Challenges: "#ffd286" };
+        const counts: Record<string, number> = { Meetings: 0, Courses: 0, Challenges: 0 };
+        for (const act of activityRows) {
+            if (counts[act.kind] !== undefined) counts[act.kind]++;
+        }
+        return Object.entries(counts)
+            .filter(([, v]) => v > 0)
+            .map(([label, value]) => ({ label, value, color: colors[label] ?? "#cdb4db" }));
+    }, [activityRows]);
 
     const [activeEmployeeEmail, setActiveEmployeeEmail] = useState<string>("");
     const [activeOrgId, setActiveOrgId] = useState<string>("");
@@ -494,6 +510,11 @@ export default function OrgDashboardPage() {
     const [statsTab, setStatsTab] = useState<StatsTab>("participants");
     const [selectedActivityKind, setSelectedActivityKind] = useState<ActivityFilter>("all");
     const [isActivityTypeOpen, setIsActivityTypeOpen] = useState(false);
+    const [selectedParticipant, setSelectedParticipant] = useState<ParticipantItem | null>(null);
+    const [participantPortfolio, setParticipantPortfolio] = useState<ParticipantPortfolioData | null>(null);
+    const [isParticipantPopupOpen, setIsParticipantPopupOpen] = useState(false);
+    const [isParticipantPortfolioLoading, setIsParticipantPortfolioLoading] = useState(false);
+    const [participantPortfolioError, setParticipantPortfolioError] = useState("");
 
     function toStringValue(value: unknown, fallback = "") {
         const text = String(value ?? "").trim();
@@ -503,6 +524,63 @@ export default function OrgDashboardPage() {
     function toNumber(value: unknown, fallback = 0) {
         const parsed = Number(value);
         return Number.isFinite(parsed) ? parsed : fallback;
+    }
+
+    function normalizeS3ImageUrl(value: unknown) {
+        const raw = String(value ?? "").trim();
+        if (!raw) return "";
+        if (raw.startsWith("http") || raw.startsWith("data:")) return raw;
+        if (/^[0-9a-f-]{36}$/i.test(raw)) return "";
+        return `https://vcep-assets-dev.s3.ap-southeast-2.amazonaws.com/${raw.replace(/^\/+/, "")}`;
+    }
+
+    function getParticipantPopupName() {
+        const info = participantPortfolio?.studentInfo;
+        const fromPortfolio = [info?.firstName, info?.lastName].filter(Boolean).join(" ").trim();
+        return fromPortfolio || selectedParticipant?.name || "Student";
+    }
+
+    function formatEducationLine(item: ParticipantPortfolioData["education"][number]) {
+        const title = [item.school, item.faculty, item.fieldOfStudy].filter(Boolean).join(" • ");
+        const year = [item.startYear, item.endYear].filter(Boolean).join(" - ");
+        const degree = item.degree ? ` (${item.degree})` : "";
+        const gpa = item.gpa ? ` • GPA ${item.gpa}` : "";
+        return `${title || "Education"}${degree}${year ? ` • ${year}` : ""}${gpa}`;
+    }
+
+    function closeParticipantPopup() {
+        setIsParticipantPopupOpen(false);
+        setSelectedParticipant(null);
+        setParticipantPortfolio(null);
+        setParticipantPortfolioError("");
+        setIsParticipantPortfolioLoading(false);
+    }
+
+    async function openParticipantPopup(person: ParticipantItem) {
+        setSelectedParticipant(person);
+        setParticipantPortfolio(null);
+        setParticipantPortfolioError("");
+        setIsParticipantPopupOpen(true);
+        setIsParticipantPortfolioLoading(true);
+
+        try {
+            const response = await fetch(`/api/organization/student/${person.id}/portfolio`, {
+                method: "GET",
+                cache: "no-store",
+                credentials: "include",
+            });
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok || !data?.ok) {
+                throw new Error(data?.message || "Failed to load student portfolio");
+            }
+
+            setParticipantPortfolio(data.data as ParticipantPortfolioData);
+        } catch (error: any) {
+            setParticipantPortfolioError(error?.message || "Failed to load student portfolio");
+        } finally {
+            setIsParticipantPortfolioLoading(false);
+        }
     }
 
     function resolveLegacyAvatarIndex(value: unknown) {
@@ -690,6 +768,10 @@ export default function OrgDashboardPage() {
                         status: toStringValue(item?.status, "pending"),
                         statusLabel: formatStatusLabel(item?.statusLabel || item?.status, statusTone),
                         statusTone,
+                        createdAt: toStringValue(
+                            item?.createdAt ?? item?.created_at ??
+                            item?.activity_create_at ?? item?.commonInfo?.activity_create_at ?? ""
+                        ),
                     };
                 })
                 : [];
@@ -697,6 +779,7 @@ export default function OrgDashboardPage() {
 
             // fetch participants from all activities and deduplicate by std_id
             const activityIds = nextActivities.map((a) => a.id).filter(Boolean);
+            let enrichedParticipants: (ParticipantItem[]) = [];
             if (activityIds.length > 0) {
                 const allParticipantFetches = await Promise.all(
                     activityIds.map((actId) =>
@@ -711,7 +794,7 @@ export default function OrgDashboardPage() {
                 );
 
                 const seen = new Set<string>();
-                const deduped: (typeof PARTICIPANTS) = [];
+                const deduped: (ParticipantItem[]) = [];
 
                 for (const list of allParticipantFetches) {
                     for (const person of list) {
@@ -762,7 +845,7 @@ export default function OrgDashboardPage() {
                 }
 
                 // enrich level + profileImage from /api/organization/student/{std_id}
-                const enrichedParticipants = await Promise.all(
+                enrichedParticipants = await Promise.all(
                     deduped.map(async (p) => {
                         try {
                             const r = await fetch(`/api/organization/student/${p.id}`, { cache: "no-store", credentials: "include" });
@@ -806,21 +889,79 @@ export default function OrgDashboardPage() {
                 : [];
             setEmployees(nextEmployees);
 
-            const nextParticipantBars: GraphBar[] = Array.isArray(data?.participantBars)
-                ? data.participantBars.map((item: any, index: number) => ({
+            // ── Participant bars: compute university distribution from enriched participants ──
+            if (Array.isArray(data?.participantBars) && data.participantBars.length > 0) {
+                setParticipantBars(data.participantBars.map((item: any, index: number) => ({
                     label: toStringValue(item?.label, `University ${index + 1}`),
                     value: toNumber(item?.value, 0),
-                }))
-                : [];
-            setParticipantBars(nextParticipantBars);
+                })));
+            } else {
+                // Normalize university name: strip common suffixes and lowercase for grouping,
+                // but keep the longest/most descriptive form for display
+                function normalizeUni(raw: string): string {
+                    return raw.toLowerCase()
+                        .replace(/\buniversity\b/g, "")
+                        .replace(/\bof\b/g, "")
+                        .replace(/\s+/g, " ")
+                        .trim();
+                }
 
-            const nextSkillBars: GraphBar[] = Array.isArray(data?.skillBars)
-                ? data.skillBars.map((item: any, index: number) => ({
+                // derive from enrichedParticipants subtitle (bio = "Major • Faculty • University")
+                const uniMap: Record<string, { count: number; display: string }> = {};
+                const participantSource = activityIds.length > 0 ? (enrichedParticipants ?? []) : [];
+                for (const p of participantSource) {
+                    const subtitle = String(p?.subtitle ?? "").trim();
+                    const parts = subtitle.split("•").map((s: string) => s.trim()).filter(Boolean);
+                    const raw = parts.length >= 2 ? parts[parts.length - 1] : subtitle || "Unknown";
+                    const key = normalizeUni(raw);
+                    if (!key) continue;
+                    if (!uniMap[key]) {
+                        uniMap[key] = { count: 0, display: raw };
+                    } else if (raw.length > uniMap[key].display.length) {
+                        uniMap[key].display = raw; // prefer longer/more descriptive name
+                    }
+                    uniMap[key].count++;
+                }
+                const computedParticipantBars: GraphBar[] = Object.values(uniMap)
+                    .sort((a, b) => b.count - a.count)
+                    .slice(0, 8)
+                    .map(({ display, count }) => ({ label: display, value: count }));
+                setParticipantBars(computedParticipantBars);
+            }
+
+            // ── Skill bars: fetch from /api/organization/activity/{id}/skills and aggregate ──
+            if (Array.isArray(data?.skillBars) && data.skillBars.length > 0) {
+                setSkillBars(data.skillBars.map((item: any, index: number) => ({
                     label: toStringValue(item?.label, `Skill ${index + 1}`),
                     value: toNumber(item?.value, 0),
-                }))
-                : [];
-            setSkillBars(nextSkillBars);
+                })));
+            } else if (nextActivities.length > 0) {
+                const allSkillFetches = await Promise.all(
+                    nextActivities.map((act) =>
+                        fetch(`/api/organization/activity/${act.id}/skills`, {
+                            cache: "no-store",
+                            credentials: "include",
+                        })
+                            .then((r) => r.json().catch(() => ({})))
+                            .then((d) => Array.isArray(d?.skills) ? d.skills : [])
+                            .catch(() => [])
+                    )
+                );
+                const skillCount: Record<string, number> = {};
+                for (const skillList of allSkillFetches) {
+                    for (const skill of skillList) {
+                        const name = String(skill?.skill_name ?? skill?.skillName ?? "").trim();
+                        if (name) skillCount[name] = (skillCount[name] ?? 0) + 1;
+                    }
+                }
+                const computedSkillBars: GraphBar[] = Object.entries(skillCount)
+                    .sort(([, a], [, b]) => b - a)
+                    .slice(0, 8)
+                    .map(([label, value]) => ({ label, value }));
+                setSkillBars(computedSkillBars);
+            } else {
+                setSkillBars([]);
+            }
 
             // Building info
             const buildingData = data?.building ?? null;
@@ -1113,7 +1254,7 @@ export default function OrgDashboardPage() {
                         </div>
 
                         <div className={styles.summaryParticipantText}>
-                            <div className={styles.summaryParticipantValue}>{summary.totalParticipants}</div>
+                            <div className={styles.summaryParticipantValue}>{participantRows.length}</div>
                             <div className={styles.summaryParticipantLabel}>Total Participants</div>
                         </div>
                     </div>
@@ -1283,83 +1424,159 @@ export default function OrgDashboardPage() {
                         </div>
 
                         {statsTab === "all" ? (
+                            summary.totalActivities === 0 ? (
+                                <div className={styles.activityEmptyState} style={{ margin: "16px 0" }}>
+                                    No activity statistics yet.
+                                </div>
+                            ) : (
                             <div className={styles.allStatisticsBody}>
-                                <div className={styles.allStatisticsToggleRow}>
-                                    <div className={styles.allStatisticsToggle}>By Month</div>
-                                    <div className={styles.allStatisticsToggle}>Activity types</div>
+                                {/* ── Left half: By Month ── */}
+                                <div className={styles.donutHalf}>
+                                    <div className={styles.donutHalfLabel}>By Month</div>
+                                    <div className={styles.donutHalfBody}>
+                                        {(() => {
+                                            const MONTH_COLORS = ["#a8dcb3","#ffd286","#66bdce","#cdb4db","#f4a5a5","#b5cff0","#f0d9b5","#c5e8d1"];
+                                            const total = monthDonutData.reduce((s, d) => s + d.value, 0) || 1;
+                                            let angle = 0;
+                                            const segments = monthDonutData.map((d, i) => {
+                                                const pct = d.value / total * 100;
+                                                const seg = { start: angle, end: angle + pct, color: MONTH_COLORS[i % MONTH_COLORS.length], ...d };
+                                                angle += pct;
+                                                return seg;
+                                            });
+                                            const hasMonthData = segments.length > 0;
+                                            const fallbackTypes = [
+                                                { value: summary.meetings, color: "#a8dcb3" },
+                                                { value: summary.courses, color: "#ffd286" },
+                                                { value: summary.challenges, color: "#66bdce" },
+                                            ].filter(d => d.value > 0);
+                                            const fallbackTotal = fallbackTypes.reduce((s, d) => s + d.value, 0) || 1;
+                                            let fa = 0;
+                                            const fallbackSegs = fallbackTypes.map(d => {
+                                                const pct = d.value / fallbackTotal * 100;
+                                                const seg = { start: fa, end: fa + pct, color: d.color };
+                                                fa += pct;
+                                                return seg;
+                                            });
+                                            const gradient = hasMonthData
+                                                ? `conic-gradient(${segments.map(s => `${s.color} ${s.start.toFixed(2)}% ${s.end.toFixed(2)}%`).join(", ")})`
+                                                : fallbackSegs.length > 0
+                                                    ? `conic-gradient(${fallbackSegs.map(s => `${s.color} ${s.start.toFixed(2)}% ${s.end.toFixed(2)}%`).join(", ")})`
+                                                    : "conic-gradient(#e5e5e5 0% 100%)";
+                                            const legendItems = hasMonthData
+                                                ? monthDonutData.map((item, i) => ({ label: item.label, value: item.value, color: MONTH_COLORS[i % MONTH_COLORS.length] }))
+                                                : [
+                                                    { label: "Meetings", value: summary.meetings, color: "#a8dcb3" },
+                                                    { label: "Courses", value: summary.courses, color: "#ffd286" },
+                                                    { label: "Challenges", value: summary.challenges, color: "#66bdce" },
+                                                  ].filter(d => d.value > 0);
+                                            return (
+                                                <>
+                                                    <div className={styles.donutBlock}>
+                                                        <div className={styles.donutRing} style={{ background: gradient }}>
+                                                            <div className={styles.donutHole} style={{ flexDirection: "column", gap: 0, fontSize: 11 }}>
+                                                                <span style={{ fontWeight: 700, fontSize: 15 }}>{summary.totalActivities}</span>
+                                                                <span style={{ fontSize: 8, color: "#777", fontWeight: 300, lineHeight: 1 }}>total</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className={styles.donutLegendGrid}>
+                                                        {legendItems.map((item) => (
+                                                            <div key={item.label} className={styles.donutLegendItem}>
+                                                                <span style={{ width: 8, height: 8, borderRadius: 2, background: item.color, flexShrink: 0 }} />
+                                                                <span className={styles.donutLegendValue}>{item.value}</span>
+                                                                <span className={styles.donutLegendLabel}>{item.label}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </>
+                                            );
+                                        })()}
+                                    </div>
                                 </div>
 
-                                <div className={styles.donutSection}>
-                                    <div className={styles.donutBlock}>
-                                        <div
-                                            className={styles.donutRing}
-                                            style={{
-                                                background:
-                                                    "conic-gradient(#a8dcb3 0 40%, #ffd286 40% 66%, #66bdce 66% 86%, #cdb4db 86% 100%)",
-                                            }}
-                                        >
-                                            <div className={styles.donutHole}>{summary.totalActivities}</div>
-                                        </div>
+                                {/* ── Center divider ── */}
+                                <div className={styles.donutSectionDivider} />
 
-                                        <div className={styles.donutLegendGrid}>
-                                            {MONTH_DONUT_LABELS.map((item) => (
-                                                <div key={item.label} className={styles.donutLegendItem}>
-                                                    <span className={styles.donutLegendValue}>{item.value}</span>
-                                                    <span className={styles.donutLegendLabel}>{item.label}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div className={styles.donutSectionDivider} />
-
-                                    <div className={styles.donutBlock}>
-                                        <div
-                                            className={styles.donutRing}
-                                            style={{
-                                                background:
-                                                    "conic-gradient(#a8dcb3 0 54%, #ffd286 54% 80%, #66bdce 80% 100%)",
-                                            }}
-                                        >
-                                            <div className={styles.donutHole}>15</div>
-                                        </div>
-
-                                        <div className={styles.donutLegendGridSingle}>
-                                            {[
-                                                { label: "Meetings", value: summary.meetings },
-                                                { label: "Courses", value: summary.courses },
-                                                { label: "Challenges", value: summary.challenges },
-                                            ].map((item) => (
-                                                <div key={item.label} className={styles.donutLegendItemWide}>
-                                                    <span className={styles.donutLegendValue}>{item.value}</span>
-                                                    <span className={styles.donutLegendLabel}>{item.label}</span>
-                                                </div>
-                                            ))}
-                                        </div>
+                                {/* ── Right half: Activity types ── */}
+                                <div className={styles.donutHalf}>
+                                    <div className={styles.donutHalfLabel}>Activity types</div>
+                                    <div className={styles.donutHalfBody}>
+                                        {(() => {
+                                            const total = typeDonutData.reduce((s, d) => s + d.value, 0) || 1;
+                                            let angle = 0;
+                                            const segments = typeDonutData.map((d) => {
+                                                const pct = d.value / total * 100;
+                                                const seg = { start: angle, end: angle + pct, ...d };
+                                                angle += pct;
+                                                return seg;
+                                            });
+                                            const gradient = segments.length > 0
+                                                ? `conic-gradient(${segments.map(s => `${s.color} ${s.start.toFixed(2)}% ${s.end.toFixed(2)}%`).join(", ")})`
+                                                : "conic-gradient(#e5e5e5 0% 100%)";
+                                            const allTypes = [
+                                                { label: "Meetings", value: summary.meetings, color: "#66bdce" },
+                                                { label: "Courses", value: summary.courses, color: "#a8dcb3" },
+                                                { label: "Challenges", value: summary.challenges, color: "#ffd286" },
+                                            ];
+                                            return (
+                                                <>
+                                                    <div className={styles.donutBlock}>
+                                                        <div className={styles.donutRing} style={{ background: gradient }}>
+                                                            <div className={styles.donutHole} style={{ flexDirection: "column", gap: 0 }}>
+                                                                <span style={{ fontWeight: 700, fontSize: 15 }}>{summary.totalActivities}</span>
+                                                                <span style={{ fontSize: 8, color: "#777", fontWeight: 300, lineHeight: 1 }}>total</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className={styles.donutLegendGridSingle}>
+                                                        {allTypes.map((item) => (
+                                                            <div key={item.label} className={styles.donutLegendItemWide}>
+                                                                <span style={{ width: 8, height: 8, borderRadius: 2, background: item.color, flexShrink: 0 }} />
+                                                                <span className={styles.donutLegendValue}>{item.value}</span>
+                                                                <span className={styles.donutLegendLabel}>{item.label}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             </div>
+                            )
                         ) : (
                             <div className={styles.statisticsBarsWrap}>
-                                <div className={styles.statisticsBarsBaseline} />
-
-                                <div className={styles.statisticsBarsRow}>
-                                    {(statsTab === "participants" ? participantBars : skillBars).map((item, index) => {
-                                        const currentBars = statsTab === "participants" ? participantBars : skillBars;
-                                        const max = Math.max(1, ...currentBars.map((bar) => bar.value || 0));
-                                        const barHeight = Math.max(42, (item.value / max) * 120);
-                                        return (
-                                            <div key={`${item.label}-${index}`} className={styles.statisticsBarItem}>
-                                                <div className={styles.statisticsBarValue} style={{ bottom: `${barHeight + 34}px` }}>{item.value}</div>
-                                                <div className={styles.statisticsBar} style={{ height: `${barHeight}px` }} />
-                                                <div className={styles.statisticsBarLabel}>
-                                                    {item.label.split("\n").map((line) => (
-                                                        <span key={line}>{line}</span>
-                                                    ))}
-                                                </div>
+                                <div className={styles.statisticsBarsUnit}>
+                                    {statsTab === "participants" ? "Number of participants (by university)" : "Number of activities (by skill)"}
+                                </div>
+                                <div className={styles.statisticsBarsChart}>
+                                    <div className={styles.statisticsBarsBaseline} />
+                                    <div className={styles.statisticsBarsRow}>
+                                        {(statsTab === "participants" ? participantBars : skillBars).length === 0 ? (
+                                            <div className={styles.activityEmptyState} style={{ width: "100%", margin: "0" }}>
+                                                No statistics available yet.
                                             </div>
-                                        );
-                                    })}
+                                        ) : (() => {
+                                            const currentBars = statsTab === "participants" ? participantBars : skillBars;
+                                            const max = Math.max(1, ...currentBars.map((bar) => bar.value || 0));
+                                            const MAX_BAR_H = 90; // px — fits safely in container
+                                            return currentBars.map((item, index) => {
+                                                const barHeight = Math.max(8, (item.value / max) * MAX_BAR_H);
+                                                return (
+                                                    <div key={`${item.label}-${index}`} className={styles.statisticsBarItem}>
+                                                        <div className={styles.statisticsBarValueWrap}>
+                                                            <span className={styles.statisticsBarValue}>{item.value}</span>
+                                                        </div>
+                                                        <div className={styles.statisticsBar} style={{ height: `${barHeight}px` }} />
+                                                        <div className={styles.statisticsBarLabel} title={item.label}>
+                                                            {item.label}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            });
+                                        })()}
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -1451,13 +1668,18 @@ export default function OrgDashboardPage() {
                         <h3 className={styles.rightTitle}>Participants</h3>
 
                         <div className={styles.studentsListScroller}>
-                            {participantRows.map((person) => (
+                            {participantRows.length === 0 ? (
+                                <div className={styles.activityEmptyState}>
+                                    No participants yet.
+                                </div>
+                            ) : participantRows.map((person) => (
                                 <button
                                     key={person.id}
                                     type="button"
                                     className={styles.studentRowButton}
-                                    aria-label={person.name}
+                                    aria-label={`Open portfolio of ${person.name}`}
                                     title={person.name}
+                                    onClick={() => openParticipantPopup(person)}
                                 >
                                     <div className={styles.studentRowCard}>
                                         <div className={styles.studentAvatar} style={{ background: person.profileImage ? "transparent" : person.avatarBg }}>
@@ -1560,6 +1782,196 @@ export default function OrgDashboardPage() {
                     </div>
                 </div>
             )}
+            {isParticipantPopupOpen && selectedParticipant && (() => {
+                const info = participantPortfolio?.studentInfo;
+                const popupPhoto = normalizeS3ImageUrl(info?.profileImageUrl) || selectedParticipant.profileImage;
+                const popupName = getParticipantPopupName();
+                const softSkills = (participantPortfolio?.skills ?? []).filter((skill) => skill.kind === "soft" && skill.isSelected !== false);
+                const technicalSkills = (participantPortfolio?.skills ?? []).filter((skill) => skill.kind !== "soft" && skill.isSelected !== false);
+                const certificates = (participantPortfolio?.certificates ?? []).filter((item) => item.isSelected !== false);
+                const experiences = (participantPortfolio?.experiences ?? []).filter((item) => item.title);
+
+                return (
+                    <div className={styles.participantPopupOverlay} onClick={closeParticipantPopup}>
+                        <div
+                            className={styles.participantPopupCard}
+                            onClick={(event) => event.stopPropagation()}
+                            role="dialog"
+                            aria-modal="true"
+                            aria-label={`Portfolio and bio of ${popupName}`}
+                        >
+                            <button
+                                type="button"
+                                className={styles.participantPopupClose}
+                                onClick={closeParticipantPopup}
+                                aria-label="Close student portfolio"
+                            >
+                                ×
+                            </button>
+
+                            <div className={styles.participantPopupHeader}>
+                                <div className={styles.participantPopupPhotoCard}>
+                                    {popupPhoto ? (
+                                        <img
+                                            src={popupPhoto}
+                                            alt={popupName}
+                                            className={styles.participantPopupPhoto}
+                                            onError={(event) => { event.currentTarget.style.display = "none"; }}
+                                        />
+                                    ) : (
+                                        <div className={styles.participantPopupInitials} style={{ background: selectedParticipant.avatarBg }}>
+                                            {selectedParticipant.initials}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className={styles.participantPopupBioCard}>
+                                    <div className={styles.participantPopupName}>{popupName}</div>
+                                    <div className={styles.participantPopupBioText}>
+                                        {info?.aboutMe || selectedParticipant.subtitle || "No bio information yet."}
+                                    </div>
+
+                                    <div className={styles.participantPopupInfoGrid}>
+                                        <div><span>Phone:</span> {info?.phone || "-"}</div>
+                                        <div><span>Email:</span> {info?.email || "-"}</div>
+                                        <div className={styles.participantPopupFullInfo}><span>Address:</span> {info?.address || "-"}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {isParticipantPortfolioLoading ? (
+                                <div className={styles.participantPopupState}>Loading portfolio...</div>
+                            ) : participantPortfolioError ? (
+                                <div className={styles.participantPopupError}>{participantPortfolioError}</div>
+                            ) : (
+                                <div className={styles.participantPopupScroll}>
+                                    <section className={styles.participantPopupSection}>
+                                        <h4>Education</h4>
+                                        <div className={styles.participantPopupSectionBody}>
+                                            {(participantPortfolio?.education ?? []).length === 0 ? (
+                                                <div className={styles.participantPopupEmpty}>No education information.</div>
+                                            ) : (
+                                                participantPortfolio!.education.map((item, index) => (
+                                                    <div key={`${item.id || "education"}-${index}`} className={styles.participantPopupLine}>{formatEducationLine(item)}</div>
+                                                ))
+                                            )}
+                                        </div>
+                                    </section>
+
+                                    <section className={styles.participantPopupSkillGrid}>
+                                        <div>
+                                            <h4>Soft Skills</h4>
+                                            <div className={styles.participantPopupSectionBody}>
+                                                {softSkills.length === 0 ? (
+                                                    <div className={styles.participantPopupEmpty}>No soft skills.</div>
+                                                ) : softSkills.map((skill, index) => (
+                                                    <div key={`${skill.id || "soft-skill"}-${index}`} className={styles.participantPopupSourceLine}>
+                                                        <img
+                                                            src={getPortfolioSourceIcon(skill.source)}
+                                                            alt={getPortfolioSourceLabel(skill.source)}
+                                                            className={styles.participantPopupSourceIcon}
+                                                        />
+                                                        <span>- {skill.name}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <h4>Technical Skills</h4>
+                                            <div className={styles.participantPopupSectionBody}>
+                                                {technicalSkills.length === 0 ? (
+                                                    <div className={styles.participantPopupEmpty}>No technical skills.</div>
+                                                ) : technicalSkills.map((skill, index) => (
+                                                    <div key={`${skill.id || "technical-skill"}-${index}`} className={styles.participantPopupSourceLine}>
+                                                        <img
+                                                            src={getPortfolioSourceIcon(skill.source)}
+                                                            alt={getPortfolioSourceLabel(skill.source)}
+                                                            className={styles.participantPopupSourceIcon}
+                                                        />
+                                                        <span>- {skill.name}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </section>
+
+                                    <section className={styles.participantPopupSection}>
+                                        <h4>Badge and Certificate</h4>
+                                        <div className={styles.participantPopupSectionBody}>
+                                            {certificates.length === 0 ? (
+                                                <div className={styles.participantPopupEmpty}>No badge or certificate.</div>
+                                            ) : (
+                                                <>
+                                                    {certificates.filter((item) => item.itemType === "certificate").length > 0 && (
+                                                        <>
+                                                            <div className={styles.participantPopupSubTitle}>Certificates</div>
+                                                            <div className={styles.participantPopupList}>
+                                                                {certificates.filter((item) => item.itemType === "certificate").map((item, index) => (
+                                                                    <div key={`${item.id || "certificate"}-${index}`} className={styles.participantPopupSourceLine}>
+                                                                        <img
+                                                                            src={getPortfolioSourceIcon(item.source)}
+                                                                            alt={getPortfolioSourceLabel(item.source)}
+                                                                            className={styles.participantPopupSourceIcon}
+                                                                        />
+                                                                        <span>- {item.title}{item.date ? ` (${item.date})` : ""}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </>
+                                                    )}
+
+                                                    {certificates.filter((item) => item.itemType === "badge").length > 0 && (
+                                                        <>
+                                                            <div className={styles.participantPopupSubTitle}>Badges</div>
+                                                            <div className={styles.participantPopupList}>
+                                                                {certificates.filter((item) => item.itemType === "badge").map((item, index) => (
+                                                                    <div key={`${item.id || "badge"}-${index}`} className={styles.participantPopupSourceLine}>
+                                                                        <img
+                                                                            src={getPortfolioSourceIcon(item.source)}
+                                                                            alt={getPortfolioSourceLabel(item.source)}
+                                                                            className={styles.participantPopupSourceIcon}
+                                                                        />
+                                                                        <span>- {item.title}{item.date ? ` (${item.date})` : ""}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                    </section>
+
+                                    <section className={styles.participantPopupSection}>
+                                        <h4>Experience and Activity</h4>
+                                        <div className={styles.participantPopupSectionBody}>
+                                            {experiences.length === 0 ? (
+                                                <div className={styles.participantPopupEmpty}>No experience or activity.</div>
+                                            ) : experiences.map((item, index) => (
+                                                <div key={`${item.id || "experience"}-${index}`} className={styles.participantPopupExperienceItem}>
+                                                    <div className={styles.participantPopupExperienceTitle}>
+                                                        <img
+                                                            src={getPortfolioSourceIcon(item.source)}
+                                                            alt={getPortfolioSourceLabel(item.source)}
+                                                            className={styles.participantPopupSourceIcon}
+                                                        />
+                                                        <span>{item.period ? `[${item.period}] - ` : ""}{item.title}</span>
+                                                    </div>
+                                                    {item.description && (
+                                                        <div className={styles.participantPopupExperienceDesc}>{item.description}</div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </section>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            })()}
+
             {/* ===== Modal: Add employee ===== */}
             {isOpen && (
                 <div className={styles.modalOverlay} role="dialog" aria-modal="true">

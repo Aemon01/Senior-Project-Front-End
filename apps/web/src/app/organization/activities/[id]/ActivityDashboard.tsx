@@ -710,26 +710,26 @@ async function fetchActivityParticipants(
 
   const baseItems: ParticipantItem[] = list.map(
     (participant: any, index: number): ParticipantItem => ({
-    id: String(
-      participant?.user_id ??
+      id: String(
+        participant?.user_id ??
         participant?.id ??
         participant?.std_id ??
         participant?.student?.std_id ??
         `participant-${index}`
-    ),
-    std_id: String(
-      participant?.std_id ??
+      ),
+      std_id: String(
+        participant?.std_id ??
         participant?.StdID ??
         participant?.student?.std_id ??
         participant?.participant_info?.participant_id ??
         ""
-    ).trim(),
-    name: resolveParticipantName(participant),
-    bio: resolveParticipantBio(participant),
-    profileImage: resolveParticipantProfileImage(participant),
-    score: resolveParticipantScore(participant),
-    level: resolveParticipantLevel(participant),
-    status: resolveParticipantStatus(participant),
+      ).trim(),
+      name: resolveParticipantName(participant),
+      bio: resolveParticipantBio(participant),
+      profileImage: resolveParticipantProfileImage(participant),
+      score: resolveParticipantScore(participant),
+      level: resolveParticipantLevel(participant),
+      status: resolveParticipantStatus(participant),
     })
   );
 
@@ -1032,7 +1032,7 @@ export default function ActivityDashboard() {
           ...detail,
           skills: mergedSkills,
         });
-        setParticipants(participantList);
+        setParticipants([...participantList].sort((a, b) => b.level - a.level));
 
         const doing = participantList.filter((item) => item.status === "Doing").length;
         const completed = participantList.filter((item) => item.status === "Completed").length;
