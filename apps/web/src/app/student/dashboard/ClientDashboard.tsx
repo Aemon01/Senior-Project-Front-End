@@ -345,8 +345,24 @@ function dedupeActivitiesFromStats(statsData?: ActivityStatsResponse["data"]) {
   return Array.from(uniqueMap.values());
 }
 
+const MOCK_PLACEHOLDER_VALUES = new Set([
+  "string", "activity", "unknown", "null", "undefined", "n/a", "none", "-", "",
+]);
+
+function isMockActivity(item: any): boolean {
+  const name = String(
+    item?.ActivityName || item?.Activity_name || item?.activity_name || ""
+  ).trim().toLowerCase();
+  const id = String(
+    item?.ActivityID || item?.Activity_id || item?.activity_id || ""
+  ).trim().toLowerCase();
+  return MOCK_PLACEHOLDER_VALUES.has(name) && MOCK_PLACEHOLDER_VALUES.has(id);
+}
+
 function mapOverviewActivities(statsData?: ActivityStatsResponse["data"]): ActivityItem[] {
-  return dedupeActivitiesFromStats(statsData).map((item, index) => {
+  return dedupeActivitiesFromStats(statsData)
+    .filter((item) => !isMockActivity(item))
+    .map((item, index) => {
     const type = getActivityTypeForStats(item);
 
     return {
@@ -610,20 +626,26 @@ function mapStudentToDashboard(api: DashboardApiResponse["data"]) {
 
   const skills: Skill[] = buildSkillProgressFromStats(undefined, skillsFromApi);
 
-  const doneActivities: ActivityItem[] = Array.isArray(api?.done_activities)
-    ? api!.done_activities!.map((item, index) => {
-      const activityType = item.activity_type || "Activity";
+  const MOCK_NAMES = new Set(["string", "activity", "unknown", "null", "undefined", "n/a", "none", "-", ""]);
 
-      return {
-        id: item.activity_id || `done-${index}`,
-        title: item.activity_name || "Activity",
-        sub: activityType,
-        xp: Number(item.xp ?? 0),
-        hours: Number((item as any).hours ?? 0),
-        status: item.status || "",
-        detailPath: getActivityDetailPath(activityType),
-      };
-    })
+  const doneActivities: ActivityItem[] = Array.isArray(api?.done_activities)
+    ? api!.done_activities!
+        .filter((item) => {
+          const name = String(item?.activity_name ?? "").trim().toLowerCase();
+          return !MOCK_NAMES.has(name);
+        })
+        .map((item, index) => {
+          const activityType = item.activity_type || "Activity";
+          return {
+            id: item.activity_id || `done-${index}`,
+            title: item.activity_name || "Activity",
+            sub: activityType,
+            xp: Number(item.xp ?? 0),
+            hours: Number((item as any).hours ?? 0),
+            status: item.status || "",
+            detailPath: getActivityDetailPath(activityType),
+          };
+        })
     : [];
 
   const schedules: ScheduleItem[] = Array.isArray(api?.schedules)
@@ -782,6 +804,9 @@ export default function ClientDashboard() {
 
   const [modal, setModal] = useState<ModalKind>(null);
 
+  const [editJobOptions, setEditJobOptions] = useState<Array<{id:string;name:string}>>([]);
+  const [editSkillOptions, setEditSkillOptions] = useState<Array<{id:string;name:string}>>([]);
+
   const [draft, setDraft] = useState({
     firstName: "",
     lastName: "",
@@ -790,6 +815,12 @@ export default function ClientDashboard() {
     email: "",
     address: "",
     about: "",
+    university: "",
+    faculty: "",
+    major: "",
+    year: "",
+    jobSelected: [] as string[],
+    skillSelected: [] as string[],
   });
 
   const closeCropModal = () => {
@@ -956,8 +987,36 @@ export default function ClientDashboard() {
       email: me.email,
       address: me.address,
       about: me.bio,
+      university: me.university,
+      faculty: me.faculty,
+      major: me.major,
+      year: me.year,
+      jobSelected: Array.isArray(me.interests) ? me.interests : [],
+      skillSelected: Array.isArray(me.skill) ? me.skill : [],
     }));
   }, [me]);
+
+  useEffect(() => {
+    if (modal !== "editProfile") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [jobsRes, skillsRes] = await Promise.all([
+          fetch("/api/options/careers", { cache: "no-store" }),
+          fetch("/api/options/skills", { cache: "no-store" }),
+        ]);
+        if (!cancelled && jobsRes.ok) {
+          const j = await jobsRes.json();
+          setEditJobOptions(Array.isArray(j) ? j : Array.isArray(j?.data) ? j.data : []);
+        }
+        if (!cancelled && skillsRes.ok) {
+          const s = await skillsRes.json();
+          setEditSkillOptions(Array.isArray(s) ? s : Array.isArray(s?.data) ? s.data : []);
+        }
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [modal]);
 
   useEffect(() => {
     if (!modal) return;
@@ -1111,6 +1170,9 @@ export default function ClientDashboard() {
 
   const saveEdit = async () => {
     try {
+      const yearNumber =
+        draft.year.trim() === "" ? null : Number.parseInt(draft.year.trim(), 10);
+
       const payload = {
         first_name: draft.firstName,
         last_name: draft.lastName,
@@ -1120,12 +1182,12 @@ export default function ClientDashboard() {
         address: draft.address,
         about_me: draft.about,
         avatar_choice: me.avatarChoiceId,
-        university: me.university,
-        faculty: me.faculty,
-        major: me.major,
-        year: me.year,
-        interests: me.interests,
-        skill: me.skill,
+        university: draft.university,
+        faculty: draft.faculty,
+        major: draft.major,
+        year: yearNumber,
+        interests: draft.jobSelected,
+        skill: draft.skillSelected,
       };
 
       const res = await fetch("/api/student", {
@@ -1145,6 +1207,8 @@ export default function ClientDashboard() {
 
       const fullName = `${draft.firstName} ${draft.lastName}`.trim() || me.name;
 
+      const educParts = [draft.university, draft.faculty, draft.major, draft.year ? `Year ${draft.year}` : ""].filter(Boolean);
+
       setMe((prev) =>
         prev
           ? {
@@ -1157,6 +1221,13 @@ export default function ClientDashboard() {
             email: draft.email,
             address: draft.address,
             bio: draft.about,
+            university: draft.university,
+            faculty: draft.faculty,
+            major: draft.major,
+            year: draft.year,
+            education: educParts.join(" • ") || prev.education,
+            interests: draft.jobSelected,
+            skill: draft.skillSelected,
           }
           : prev
       );
@@ -1213,25 +1284,34 @@ export default function ClientDashboard() {
             <StudentCalendar siteEvents={schedules} />
           </div>
 
-          {modal && (
-            <ModalShell onClose={() => setModal(null)}>
-              {modal === "editProfile" && (
-                <EditProfileModal
-                  draft={draft}
-                  setDraft={setDraft}
-                  onCancel={() => setModal(null)}
-                  onSave={saveEdit}
-                />
-              )}
-
-              {modal === "badges" && (
-                <GridModal title="Badges" count={8} onClose={() => setModal(null)} />
-              )}
-
-              {modal === "certificate" && (
-                <GridModal title="Certificate" count={6} onClose={() => setModal(null)} />
-              )}
+          {modal === "editProfile" && (
+            <ModalShell
+              title="Personal Information"
+              onClose={() => setModal(null)}
+              footer={
+                <>
+                  <button className={styles.secondaryBtn} type="button" onClick={() => setModal(null)} aria-label="Cancel"><img src="/images/icons/button02-icon.png" alt="Cancel" className={styles.iconBtnImg} /></button>
+                  <button className={styles.primaryBtn} type="button" onClick={saveEdit} aria-label="Save"><img src="/images/icons/button01-icon.png" alt="Save" className={styles.iconBtnImg} /></button>
+                </>
+              }
+            >
+              <EditProfileModal
+                draft={draft}
+                setDraft={setDraft}
+                jobOptions={editJobOptions}
+                skillOptions={editSkillOptions}
+                onCancel={() => setModal(null)}
+                onSave={saveEdit}
+              />
             </ModalShell>
+          )}
+
+          {modal === "badges" && (
+            <GridModal title="Badges" count={8} onClose={() => setModal(null)} />
+          )}
+
+          {modal === "certificate" && (
+            <GridModal title="Certificate" count={6} onClose={() => setModal(null)} />
           )}
 
           {cropOpen && cropUrl && (
@@ -1441,7 +1521,7 @@ function TopProfileRow({
           aria-label="Edit personal information"
           onClick={onEdit}
         >
-          ✎
+          <img src="/images/icons/button03-icon.png" alt="Edit" className={styles.iconBtnImg} />
         </button>
 
         <div className={styles.bioInformation}>
@@ -2326,11 +2406,25 @@ function CalendarCard({
   );
 }
 
-function ModalShell({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+function ModalShell({ title, onClose, children, footer }: {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+  footer: React.ReactNode;
+}) {
   return (
-    <div className={styles.modalOverlay} role="dialog" aria-modal="true" onMouseDown={onClose}>
-      <div className={styles.modalCard} onMouseDown={(e) => e.stopPropagation()}>
-        {children}
+    <div className={styles.modalOverlay} role="dialog" aria-modal="true">
+      <div className={styles.modal}>
+        <div className={styles.modalHeader}>
+          <h2 className={styles.modalTitle}>{title}</h2>
+          <button className={styles.modalClose} type="button" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+        <div className={styles.modalBody}>
+          {children}
+        </div>
+        <div className={styles.modalFooter}>
+          {footer}
+        </div>
       </div>
     </div>
   );
@@ -2339,40 +2433,58 @@ function ModalShell({ onClose, children }: { onClose: () => void; children: Reac
 function EditProfileModal({
   draft,
   setDraft,
+  jobOptions,
+  skillOptions,
   onCancel,
   onSave,
 }: {
   draft: {
-    firstName: string;
-    lastName: string;
-    birthDate: string;
-    phone: string;
-    email: string;
-    address: string;
-    about: string;
+    firstName: string; lastName: string; birthDate: string; phone: string;
+    email: string; address: string; about: string;
+    university: string; faculty: string; major: string; year: string;
+    jobSelected: string[]; skillSelected: string[];
   };
   setDraft: React.Dispatch<React.SetStateAction<any>>;
+  jobOptions: Array<{id:string;name:string}>;
+  skillOptions: Array<{id:string;name:string}>;
   onCancel: () => void;
   onSave: () => void;
 }) {
+  const [openJob, setOpenJob] = useState(false);
+  const [openSkill, setOpenSkill] = useState(false);
+
+  const toggleJob = (id: string) =>
+    setDraft((p: any) => ({
+      ...p,
+      jobSelected: p.jobSelected.includes(id)
+        ? p.jobSelected.filter((x: string) => x !== id)
+        : [...p.jobSelected, id],
+    }));
+
+  const toggleSkill = (id: string) =>
+    setDraft((p: any) => ({
+      ...p,
+      skillSelected: p.skillSelected.includes(id)
+        ? p.skillSelected.filter((x: string) => x !== id)
+        : [...p.skillSelected, id],
+    }));
+
   return (
     <>
-      <div className={styles.modalTitle}>Personal Information</div>
-
       <div className={styles.modalForm}>
-        <Field label="First name">
-          <input className={styles.modalInput} value={draft.firstName} onChange={(e) => setDraft((p: any) => ({ ...p, firstName: e.target.value }))} />
-        </Field>
-
-        <Field label="Last name">
-          <input className={styles.modalInput} value={draft.lastName} onChange={(e) => setDraft((p: any) => ({ ...p, lastName: e.target.value }))} />
-        </Field>
+        <div className={styles.modalGrid2}>
+          <Field label="First name">
+            <input className={styles.modalInput} value={draft.firstName} onChange={(e) => setDraft((p: any) => ({ ...p, firstName: e.target.value }))} />
+          </Field>
+          <Field label="Last name">
+            <input className={styles.modalInput} value={draft.lastName} onChange={(e) => setDraft((p: any) => ({ ...p, lastName: e.target.value }))} />
+          </Field>
+        </div>
 
         <div className={styles.modalGrid2}>
           <Field label="Birth date">
-            <input className={styles.modalInput} value={draft.birthDate} onChange={(e) => setDraft((p: any) => ({ ...p, birthDate: e.target.value }))} />
+            <input className={styles.modalInput} type="date" value={draft.birthDate} onChange={(e) => setDraft((p: any) => ({ ...p, birthDate: e.target.value }))} />
           </Field>
-
           <Field label="Phone number">
             <input className={styles.modalInput} value={draft.phone} onChange={(e) => setDraft((p: any) => ({ ...p, phone: e.target.value }))} />
           </Field>
@@ -2389,17 +2501,89 @@ function EditProfileModal({
         <Field label="About me">
           <textarea className={styles.modalTextarea} value={draft.about} onChange={(e) => setDraft((p: any) => ({ ...p, about: e.target.value }))} />
         </Field>
+
+        <div className={styles.modalHr} />
+
+        <Field label="University">
+          <input className={styles.modalInput} value={draft.university} onChange={(e) => setDraft((p: any) => ({ ...p, university: e.target.value }))} />
+        </Field>
+
+        <Field label="Faculty">
+          <input className={styles.modalInput} value={draft.faculty} onChange={(e) => setDraft((p: any) => ({ ...p, faculty: e.target.value }))} />
+        </Field>
+
+        <div className={styles.modalGrid2}>
+          <Field label="Major">
+            <input className={styles.modalInput} value={draft.major} onChange={(e) => setDraft((p: any) => ({ ...p, major: e.target.value }))} />
+          </Field>
+          <Field label="Year">
+            <input className={styles.modalInput} value={draft.year} inputMode="numeric" onChange={(e) => setDraft((p: any) => ({ ...p, year: e.target.value }))} />
+          </Field>
+        </div>
+
+        <div className={styles.modalHr} />
+
+        <button type="button" className={styles.modalPickField} onClick={() => setOpenJob((v) => !v)}>
+          <span className={draft.jobSelected.length ? undefined : styles.modalPickPlaceholder}>
+            {draft.jobSelected.length
+              ? jobOptions.filter((o) => draft.jobSelected.includes(o.id)).map((o) => o.name).join(", ") || "Job of interest"
+              : "Job of interest"}
+          </span>
+        </button>
+        {openJob && (
+          <EditSelectorBox title="Job of interest" options={jobOptions} selectedIds={draft.jobSelected} onToggle={toggleJob} />
+        )}
+
+        <button type="button" className={styles.modalPickField} onClick={() => setOpenSkill((v) => !v)}>
+          <span className={draft.skillSelected.length ? undefined : styles.modalPickPlaceholder}>
+            {draft.skillSelected.length
+              ? skillOptions.filter((o) => draft.skillSelected.includes(o.id)).map((o) => o.name).join(", ") || "Your skills"
+              : "Your skills"}
+          </span>
+        </button>
+        {openSkill && (
+          <EditSelectorBox title="Your skills" options={skillOptions} selectedIds={draft.skillSelected} onToggle={toggleSkill} />
+        )}
       </div>
 
-      <div className={styles.modalActions}>
-        <button className={cx(styles.modalBtn, styles.modalOk)} type="button" onClick={onSave} aria-label="Save">
-          ✓
-        </button>
-        <button className={cx(styles.modalBtn, styles.modalCancel)} type="button" onClick={onCancel} aria-label="Cancel">
-          ✕
-        </button>
-      </div>
     </>
+  );
+}
+
+function EditSelectorBox({
+  title, options, selectedIds, onToggle,
+}: {
+  title: string;
+  options: Array<{id:string;name:string}>;
+  selectedIds: string[];
+  onToggle: (id: string) => void;
+}) {
+  const [q, setQ] = useState("");
+  const filtered = options.filter((o) =>
+    !q.trim() || o.name.toLowerCase().includes(q.trim().toLowerCase())
+  );
+  return (
+    <div className={styles.modalSelectorBox}>
+      <div className={styles.modalSelectorTag}>{title}</div>
+      <div className={styles.modalSearchRow}>
+        <span className={styles.modalSearchIcon}>⌕</span>
+        <input className={styles.modalSearchInput} placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} />
+      </div>
+      <div className={styles.modalOptionGrid}>
+        {filtered.map((o) => {
+          const on = selectedIds.includes(o.id);
+          return (
+            <div key={o.id} className={styles.modalOptionItem} role="button" tabIndex={0}
+              onClick={() => onToggle(o.id)}
+              onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onToggle(o.id)}
+            >
+              <div className={cx(styles.modalCheckBox, on && styles.modalCheckBoxOn)}>{on ? "✓" : ""}</div>
+              <div className={styles.modalOptionLabel}>{o.name}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -2414,18 +2598,18 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function GridModal({ title, count, onClose }: { title: string; count: number; onClose: () => void }) {
   return (
-    <>
-      <div className={styles.modalTitle}>{title}</div>
+    <ModalShell
+      title={title}
+      onClose={onClose}
+      footer={
+        <button className={styles.primaryBtn} type="button" onClick={onClose} aria-label="Close"><img src="/images/icons/button01-icon.png" alt="Close" className={styles.iconBtnImg} /></button>
+      }
+    >
       <div className={styles.modalGridBadges}>
         {Array.from({ length: count }).map((_, i) => (
           <div key={i} className={styles.modalBadgeBox} />
         ))}
       </div>
-      <div className={styles.modalActions}>
-        <button className={cx(styles.modalBtn, styles.modalOk)} type="button" onClick={onClose} aria-label="Close">
-          ✓
-        </button>
-      </div>
-    </>
+    </ModalShell>
   );
 }

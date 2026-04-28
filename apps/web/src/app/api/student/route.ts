@@ -310,7 +310,33 @@ export async function GET(req: Request) {
     }
 
     const dashboardRaw = await fetchStudentDashboard(student.std_id, accessToken);
-    const studentInfo = dashboardRaw?.student_info ?? {};
+    // dashboardRaw?.student_info อาจ return mock data — fallback ไป student object ที่ดึงมาตรงๆ
+    const dashboardStudentInfo = dashboardRaw?.student_info ?? {};
+    const studentInfo = {
+      ...dashboardStudentInfo,
+      // ถ้า dashboard endpoint ส่ง mock/ว่าง ให้ใช้ค่าจาก student object แทน
+      first_name: dashboardStudentInfo.first_name || student.first_name || "",
+      last_name: dashboardStudentInfo.last_name || student.last_name || "",
+      phone: dashboardStudentInfo.phone || student.phone || "",
+      email: dashboardStudentInfo.email || student.email || "",
+      address: dashboardStudentInfo.address || student.address || "",
+      about_me: dashboardStudentInfo.about_me || student.about_me || "",
+      university: dashboardStudentInfo.university || student.university || "",
+      faculty: dashboardStudentInfo.faculty || student.faculty || "",
+      major: dashboardStudentInfo.major || student.major || "",
+      year: dashboardStudentInfo.year ?? student.year ?? null,
+      birth_date: dashboardStudentInfo.birth_date || student.birth_date || "",
+      avatar_choice: dashboardStudentInfo.avatar_choice || student.avatar_choice || null,
+      profile_image_url: dashboardStudentInfo.profile_image_url || student.profile_image_url || "",
+      interests: dashboardStudentInfo.interests ?? student.interests ?? [],
+      skill: dashboardStudentInfo.skill ?? student.skill ?? [],
+      level: dashboardStudentInfo.level ?? student.level ?? 1,
+      current_exp: dashboardStudentInfo.current_exp ?? student.current_exp ?? 0,
+      total_exp: dashboardStudentInfo.total_exp ?? student.total_exp ?? student.current_exp ?? 0,
+      profile: dashboardStudentInfo.profile || student.profile || null,
+      user_id: dashboardStudentInfo.user_id || student.user_id || backendUser.user_id,
+      std_id: dashboardStudentInfo.std_id || student.std_id,
+    };
     const profileObj = parseJsonObject(studentInfo.profile);
     const achievementObj = parseJsonObject(studentInfo.achievement);
     const portfolioObj = parseJsonObject(studentInfo.portfolio);
@@ -338,7 +364,7 @@ export async function GET(req: Request) {
           last_name: studentInfo.last_name ?? "",
           birth_date: toInputDate(studentInfo.birth_date),
           phone: studentInfo.phone ?? "",
-          email: profileObj?.email ?? "",
+          email: studentInfo.email?.trim() || profileObj?.email?.trim() || "",
           address: studentInfo.address ?? student.address ?? "",
           about_me: studentInfo.about_me ?? student.about_me ?? "",
           university: studentInfo.university ?? "",
@@ -352,6 +378,7 @@ export async function GET(req: Request) {
           skill: normalizeStringArray(studentInfo.skill),
           level: Number(studentInfo.level ?? 1),
           current_exp: Number(studentInfo.current_exp ?? 0),
+          total_exp: Number(studentInfo.total_exp ?? studentInfo.current_exp ?? 0),
           xp_max: Math.max(100, Number(studentInfo.level ?? 1) * 100),
           avatar_choice: studentInfo.avatar_choice ?? null,
           profile_image_url: toPublicAvatarUrl(studentInfo.profile_image_url) ?? null,

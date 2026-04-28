@@ -34,6 +34,14 @@ function getAccessToken(req: Request) {
   return readCookie(cookieHeader, "vcep_access");
 }
 
+function pickString(...values: unknown[]) {
+  for (const value of values) {
+    const text = String(value ?? "").trim();
+    if (text && text !== "null" && text !== "undefined" && text !== "string") return text;
+  }
+  return "";
+}
+
 function safeArray<T = any>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
 }
@@ -50,14 +58,6 @@ function safeObject(value: unknown): Record<string, any> {
   return {};
 }
 
-function pickString(...values: unknown[]) {
-  for (const value of values) {
-    const text = String(value ?? "").trim();
-    if (text && text !== "null" && text !== "undefined") return text;
-  }
-  return "";
-}
-
 function normalizeDate(value: unknown) {
   const text = pickString(value);
   if (!text) return "";
@@ -66,20 +66,9 @@ function normalizeDate(value: unknown) {
 
 function normalizeSource(value: unknown): "upload" | "platform" {
   const text = String(value ?? "").trim().toLowerCase();
-
-  // Match PortfolioPage icons exactly:
-  // sign01-icon.png = Uploaded by user, sign02-icon.png = Platform.
-  if (
-    text === "upload" ||
-    text === "uploaded" ||
-    text === "uploaded by user" ||
-    text === "user" ||
-    text === "manual" ||
-    text === "custom"
-  ) {
+  if (["upload", "uploaded", "uploaded by user", "uploaded_by_user", "user", "manual", "custom"].includes(text)) {
     return "upload";
   }
-
   return "platform";
 }
 
@@ -90,8 +79,8 @@ function normalizeSkillKind(value: unknown): "soft" | "technical" {
 
 function unwrapPortfolio(json: any) {
   if (!json) return {};
+  if (json?.data?.student_info || json?.data?.studentInfo || json?.data?.education || json?.data?.skills) return json.data;
   if (json?.data?.Info || json?.data?.Education || json?.data?.Skills) return json.data;
-  if (json?.data?.info || json?.data?.education || json?.data?.skills) return json.data;
   if (json?.data) return json.data;
 
   const keys = Object.keys(json);
@@ -99,18 +88,16 @@ function unwrapPortfolio(json: any) {
   return json;
 }
 
-function getCandidateObjects(...values: unknown[]) {
-  const result: Record<string, any>[] = [];
-
+function candidateObjects(...values: unknown[]) {
+  const out: Record<string, any>[] = [];
   for (const value of values) {
     const root = safeObject(value);
-    const candidates = [
+    const list = [
       root,
-      root.Info,
-      root.info,
       root.student_info,
       root.studentInfo,
-      root.StudentInfo,
+      root.Info,
+      root.info,
       root.student,
       root.Student,
       root.profile,
@@ -120,19 +107,19 @@ function getCandidateObjects(...values: unknown[]) {
       root.commonInfo,
       root.common_info,
       root.data,
-      root.data?.Info,
-      root.data?.info,
       root.data?.student_info,
       root.data?.studentInfo,
+      root.data?.Info,
+      root.data?.info,
+      root.data?.student,
+      root.data?.profile,
     ];
-
-    for (const candidate of candidates) {
-      const object = safeObject(candidate);
-      if (Object.keys(object).length > 0) result.push(object);
+    for (const item of list) {
+      const obj = safeObject(item);
+      if (Object.keys(obj).length) out.push(obj);
     }
   }
-
-  return result;
+  return out;
 }
 
 function pickFromObjects(objects: Record<string, any>[], ...keys: string[]) {
@@ -146,12 +133,8 @@ function pickFromObjects(objects: Record<string, any>[], ...keys: string[]) {
 }
 
 function firstArray(...values: unknown[]) {
-  for (const value of values) {
-    if (Array.isArray(value) && value.length > 0) return value;
-  }
-  for (const value of values) {
-    if (Array.isArray(value)) return value;
-  }
+  for (const value of values) if (Array.isArray(value) && value.length > 0) return value;
+  for (const value of values) if (Array.isArray(value)) return value;
   return [];
 }
 
@@ -178,53 +161,61 @@ async function fetchJson(url: string, accessToken: string) {
 }
 
 function normalizeStudentInfo(portfolioRoot: any, dashboardRoot: any, studentRoot: any) {
-  const objects = getCandidateObjects(portfolioRoot, dashboardRoot, studentRoot);
+  const objects = candidateObjects(portfolioRoot, dashboardRoot, studentRoot);
+
+  const firstName = pickFromObjects(objects, "first_name", "firstName", "FirstName");
+  const lastName = pickFromObjects(objects, "last_name", "lastName", "LastName");
+  const fullName = pickFromObjects(objects, "name", "full_name", "fullName", "participant_name");
+  const parts = fullName.split(/\s+/).filter(Boolean);
 
   return {
-    firstName: pickFromObjects(objects, "first_name", "firstName", "FirstName", "name", "full_name", "fullName"),
-    lastName: pickFromObjects(objects, "last_name", "lastName", "LastName", "surname", "family_name", "familyName"),
-    phone: pickFromObjects(objects, "phone", "Phone", "phone_number", "phoneNumber"),
-    email: pickFromObjects(objects, "email", "Email"),
+    first_name: firstName || parts[0] || "",
+    last_name: lastName || parts.slice(1).join(" ") || "",
+    phone: pickFromObjects(objects, "phone", "Phone", "phone_number", "phoneNumber", "participant_phone"),
+    email: pickFromObjects(objects, "email", "Email", "participant_email"),
     address: pickFromObjects(objects, "address", "Address", "location", "Location"),
-    aboutMe: pickFromObjects(objects, "about_me", "aboutMe", "AboutMe", "bio", "description"),
-    profileImageUrl: pickFromObjects(objects, "profile_image_url", "profileImageUrl", "ProfileImageUrl", "profile_image", "avatar_image_url", "avatarImageUrl", "image_url", "imageUrl"),
+    about_me: pickFromObjects(objects, "about_me", "aboutMe", "AboutMe", "bio", "about", "description"),
+    birth_date: pickFromObjects(objects, "birth_date", "birthDate", "BirthDate"),
+    profile_image_url: pickFromObjects(objects, "profile_image_url", "profileImageUrl", "ProfileImageUrl", "profile_image", "avatar_image_url", "avatarImageUrl", "image_url", "imageUrl", "participant_avatar"),
   };
 }
 
 function normalizeEducation(portfolioRoot: any, dashboardRoot: any, studentRoot: any) {
   return firstArray(
-    portfolioRoot?.Education,
     portfolioRoot?.education,
-    dashboardRoot?.Education,
+    portfolioRoot?.Education,
+    portfolioRoot?.student_info?.education,
+    portfolioRoot?.studentInfo?.education,
     dashboardRoot?.education,
-    studentRoot?.Education,
+    dashboardRoot?.Education,
     studentRoot?.education,
+    studentRoot?.Education,
   )
     .map((item: any, index: number) => ({
       id: pickString(item?.id) || `education-${index}`,
-      school: pickString(item?.institution, item?.school, item?.university, item?.facultyschool),
-      degree: pickString(item?.degreeLevel, item?.degree_level, item?.degree),
+      school: pickString(item?.school, item?.university, item?.institution, item?.facultyschool),
+      degree: pickString(item?.degree, item?.degreeLevel, item?.degree_level, item?.education_level),
       faculty: pickString(item?.faculty),
-      fieldOfStudy: pickString(item?.major, item?.field_of_study, item?.fieldOfStudy),
-      startYear: pickString(item?.startYear, item?.start_year),
-      endYear: pickString(item?.endYear, item?.end_year),
+      fieldOfStudy: pickString(item?.fieldOfStudy, item?.field_of_study, item?.major, item?.department),
+      startYear: pickString(item?.startYear, item?.start_year, item?.from),
+      endYear: pickString(item?.endYear, item?.end_year, item?.to),
       gpa: pickString(item?.gpa),
     }))
-    .filter((item: any) => Boolean(item.school || item.degree || item.faculty || item.fieldOfStudy));
+    .filter((item: any) => Boolean(item.school || item.degree || item.faculty || item.fieldOfStudy || item.startYear || item.endYear));
 }
 
 function normalizeSkills(portfolioRoot: any) {
   const seen = new Set<string>();
-  return safeArray<any>(portfolioRoot?.Skills ?? portfolioRoot?.skills)
-    .map((item, index) => ({
-      id: pickString(item?.skillID, item?.skill_id, item?.id) || `skill-${index}`,
-      name: pickString(item?.name, item?.Name, item?.skill_name, item?.skillName),
-      kind: normalizeSkillKind(item?.category ?? item?.Category ?? item?.kind ?? item?.skill_type),
+  return firstArray(portfolioRoot?.skills, portfolioRoot?.Skills)
+    .map((item: any, index: number) => ({
+      id: pickString(item?.id, item?.skillID, item?.skill_id) || `skill-${index}`,
+      name: pickString(item?.name, item?.Name, item?.skill_name, item?.skillName, item?.title),
+      kind: normalizeSkillKind(item?.kind ?? item?.category ?? item?.Category ?? item?.skill_type ?? item?.skill_category),
       source: item?.fromSystem === true || item?.FromSystem === true ? "platform" : normalizeSource(item?.source),
-      isSelected: typeof item?.enable === "boolean" ? item.enable : typeof item?.isSelected === "boolean" ? item.isSelected : true,
+      isSelected: typeof item?.isSelected === "boolean" ? item.isSelected : typeof item?.enable === "boolean" ? item.enable : true,
     }))
     .filter((item) => {
-      if (!item.name) return false;
+      if (!item.name || item.isSelected === false) return false;
       const key = `${item.name.toLowerCase()}|${item.kind}`;
       if (seen.has(key)) return false;
       seen.add(key);
@@ -233,28 +224,28 @@ function normalizeSkills(portfolioRoot: any) {
 }
 
 function normalizeCertificates(portfolioRoot: any) {
-  return safeArray<any>(portfolioRoot?.Certificates ?? portfolioRoot?.certificates ?? portfolioRoot?.certificate)
-    .map((item, index) => ({
+  return firstArray(portfolioRoot?.certificates, portfolioRoot?.certificate, portfolioRoot?.Certificates)
+    .map((item: any, index: number) => ({
       id: pickString(item?.id) || `certificate-${index}`,
-      title: pickString(item?.name, item?.title),
-      date: normalizeDate(item?.date),
-      itemType: String(item?.type ?? item?.itemType ?? "certificate").toLowerCase().includes("badge") ? "badge" as const : "certificate" as const,
+      title: pickString(item?.title, item?.name, item?.certificate_name, item?.certificateName),
+      date: normalizeDate(item?.date ?? item?.issued_at ?? item?.year),
+      itemType: String(item?.itemType ?? item?.type ?? "certificate").toLowerCase().includes("badge") ? ("badge" as const) : ("certificate" as const),
       source: item?.fromSystem === true || item?.FromSystem === true ? "platform" : normalizeSource(item?.source),
-      isSelected: typeof item?.enable === "boolean" ? item.enable : typeof item?.isSelected === "boolean" ? item.isSelected : true,
+      isSelected: typeof item?.isSelected === "boolean" ? item.isSelected : typeof item?.enable === "boolean" ? item.enable : true,
     }))
-    .filter((item) => item.title);
+    .filter((item) => item.title && item.isSelected !== false);
 }
 
 function normalizeExperiences(portfolioRoot: any) {
-  return safeArray<any>(portfolioRoot?.Experience ?? portfolioRoot?.experience ?? portfolioRoot?.experiences)
-    .map((item, index) => {
+  return firstArray(portfolioRoot?.experiences, portfolioRoot?.experience, portfolioRoot?.Experience, portfolioRoot?.activities, portfolioRoot?.Activities)
+    .map((item: any, index: number) => {
       const startYear = pickString(item?.startYear, item?.StartYear, item?.start_year);
       const endYear = pickString(item?.endYear, item?.EndYear, item?.end_year);
       return {
-        id: pickString(item?.activityID, item?.ActivityID, item?.id) || `experience-${index}`,
-        period: startYear && endYear ? `${startYear} - ${endYear}` : startYear || endYear,
-        title: pickString(item?.topic, item?.Topic, item?.title),
-        description: pickString(item?.description, item?.Description),
+        id: pickString(item?.id, item?.activityID, item?.ActivityID, item?.activity_id) || `experience-${index}`,
+        period: pickString(item?.period) || (startYear && endYear ? `${startYear} - ${endYear}` : startYear || endYear),
+        title: pickString(item?.title, item?.topic, item?.Topic, item?.activity_name, item?.name),
+        description: pickString(item?.description, item?.Description, item?.detail, item?.activity_detail),
         source: item?.fromSystem === true || item?.FromSystem === true ? "platform" : normalizeSource(item?.source),
         enable: typeof item?.enable === "boolean" ? item.enable : true,
       };
@@ -284,11 +275,13 @@ export async function GET(req: Request, context: RouteContext) {
     const portfolioRoot = unwrapPortfolio(portfolioJson);
     const dashboardRoot = unwrapPortfolio(dashboardJson);
     const studentRoot = unwrapPortfolio(studentJson);
+    const studentInfo = normalizeStudentInfo(portfolioRoot, dashboardRoot, studentRoot);
 
     return NextResponse.json({
       ok: true,
       data: {
-        studentInfo: normalizeStudentInfo(portfolioRoot, dashboardRoot, studentRoot),
+        student_info: studentInfo,
+        studentInfo,
         education: normalizeEducation(portfolioRoot, dashboardRoot, studentRoot),
         skills: normalizeSkills(portfolioRoot),
         certificates: normalizeCertificates(portfolioRoot),
