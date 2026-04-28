@@ -423,24 +423,85 @@ export default function ActivityDashboard() {
     }));
   }, [data]);
 
-    const activities = useMemo(() => {
-        if (!data?.registered_activities || data.registered_activities.length === 0) return ACTIVITIES;
-        return data.registered_activities.map((a: any, i: number) => ({
-            id: a.ActivityID || `act-${i}`,
-            activity_name: a.ActivityName || "Activity",
-            difficulty: "Beginner",
-            activity_type: a.ActivityType || "Course",
-            hours: a.Hours,
-            status: a.Status === "Publish" ? "can join" : "pending"
-        }));
-    }, [data]);
-    if (loading) {
-        return (
-            <div className={styles.dash}>
-                <div style={{ padding: 24 }}>Loading dashboard...</div>
-            </div>
-        );
-    }
+  const MOCK_ACTIVITY_NAMES = new Set([
+    "string", "activity", "unknown", "null", "undefined", "n/a", "none", "-", "",
+  ]);
+
+  const activities = useMemo<ActivityRow[]>(() => {
+    // registered_activities → fallback all_activities
+    const registeredActivities: any[] = Array.isArray(data?.registered_activities) && data.registered_activities.length > 0
+      ? data.registered_activities
+      : Array.isArray(data?.all_activities)
+        ? data.all_activities
+        : [];
+
+    if (registeredActivities.length === 0) return [];
+
+    // Dedup: keep highest-status entry per activity id (same logic as stats)
+    const dedupMap = new Map<string, any>();
+    registeredActivities.forEach((activity: any, index: number) => {
+      const id = String(normalizeActivityId(activity, index));
+      if (!dedupMap.has(id)) {
+        dedupMap.set(id, activity);
+      } else {
+        const existing = dedupMap.get(id);
+        const existingStatus = getActivityStatusForStats(existing);
+        const currentStatus = getActivityStatusForStats(activity);
+        if (getStatusRank(currentStatus) >= getStatusRank(existingStatus)) {
+          dedupMap.set(id, activity);
+        }
+      }
+    });
+
+    return Array.from(dedupMap.values())
+      .filter((activity: any) => {
+        const name = String(
+          activity?.ActivityName || activity?.Activity_name || activity?.activity_name || ""
+        ).trim().toLowerCase();
+        const id = String(
+          activity?.ActivityID || activity?.Activity_id || activity?.activity_id || ""
+        ).trim().toLowerCase();
+        return !(MOCK_ACTIVITY_NAMES.has(name) && MOCK_ACTIVITY_NAMES.has(id));
+      })
+      .map((activity: any, index: number) => {
+      const normalizedType = normalizeType(activity);
+      const detailPath =
+        normalizedType === "challenge"
+          ? CHALLENGE_DETAIL_PATH
+          : normalizedType === "meeting"
+            ? MEETING_DETAIL_PATH
+            : COURSE_DETAIL_PATH;
+
+      return {
+        id: String(normalizeActivityId(activity, index)),
+        activity_name: String(
+          activity?.ActivityName ||
+          activity?.Activity_name ||
+          activity?.activity_name ||
+          "Activity"
+        ),
+        difficulty: String(activity?.difficulty || activity?.Difficulty || "Beginner"),
+        activity_type: String(
+          activity?.ActivityType ||
+          activity?.Activity_type ||
+          activity?.activity_type ||
+          "Course"
+        ),
+        hours: toNumber(activity?.Hours ?? activity?.hours, 0),
+        status: normalizeActivityStatus(activity),
+        detailPath,
+        organization: String(activity?.organization || activity?.Organization || "").trim(),
+      };
+    });
+  }, [data]);
+
+  if (loading) {
+    return (
+      <div className={styles.dash}>
+        <div style={{ padding: 24 }}>Loading dashboard...</div>
+      </div>
+    );
+  }
 
   if (error) {
     return (

@@ -27,6 +27,7 @@ type CertificateItem = {
     date: string;
     itemType: "certificate" | "badge";
     badgeLink: string;
+    fileName?: string;
     source: ItemSource;
     isSelected: boolean;
 };
@@ -137,6 +138,77 @@ const emptySkillForm: SkillFormState = {
 
 // platformSkillOptions and platformExperienceOptions are now derived dynamically from state
 
+const PUBLIC_ASSET_BASE =
+    process.env.NEXT_PUBLIC_S3_PUBLIC_BASE_URL ||
+    "https://vcep-assets-dev.s3.ap-southeast-2.amazonaws.com";
+
+function toPublicAssetUrl(value?: string | null) {
+    const raw = String(value ?? "").trim();
+    if (!raw || raw === "null" || raw === "undefined") return "";
+    if (raw.startsWith("blob:")) return raw;
+    if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+    return `${PUBLIC_ASSET_BASE.replace(/\/+$/, "")}/${raw.replace(/^\/+/, "")}`;
+}
+
+function extractUploadedAssetUrl(result: any) {
+    const candidates: unknown[] = [];
+
+    function visit(value: any, depth = 0) {
+        if (!value || depth > 4) return;
+        if (typeof value === "string") {
+            candidates.push(value);
+            return;
+        }
+        if (typeof value !== "object") return;
+
+        const preferredKeys = [
+            "url",
+            "publicUrl",
+            "public_url",
+            "fileUrl",
+            "file_url",
+            "Location",
+            "location",
+            "key",
+            "Key",
+            "path",
+        ];
+
+        for (const key of preferredKeys) {
+            if (value[key]) candidates.push(value[key]);
+        }
+
+        for (const child of Object.values(value)) {
+            visit(child, depth + 1);
+        }
+    }
+
+    visit(result);
+
+    const asset = candidates
+        .map((item) => String(item ?? "").trim())
+        .find((item) =>
+            Boolean(item) &&
+            item !== "null" &&
+            item !== "undefined" &&
+            (/^https?:\/\//i.test(item) ||
+                item.includes("student-certificates/") ||
+                item.includes("student-profile/") ||
+                item.includes("student-profiles/") ||
+                /\.(png|jpe?g|gif|webp|svg|pdf)(\?.*)?$/i.test(item))
+        );
+
+    return toPublicAssetUrl(asset || "");
+}
+
+function pickString(...values: unknown[]) {
+    for (const value of values) {
+        const text = String(value ?? "").trim();
+        if (text && text !== "null" && text !== "undefined") return text;
+    }
+    return "";
+}
+
 function makeId(prefix: string) {
     return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -149,6 +221,36 @@ function getSourceIcon(source: ItemSource) {
 
 function getSourceLabel(source: ItemSource) {
     return source === "upload" ? "Uploaded by user" : "Platform";
+}
+
+function getFileNameFromUrl(url: string) {
+    const cleanUrl = String(url ?? "").trim();
+    if (!cleanUrl) return "";
+
+    try {
+        const parsed = new URL(cleanUrl);
+        const lastPart = parsed.pathname.split("/").filter(Boolean).pop() ?? "";
+        return decodeURIComponent(lastPart);
+    } catch {
+        const lastPart = cleanUrl.split("?")[0].split("/").filter(Boolean).pop() ?? "";
+        try {
+            return decodeURIComponent(lastPart);
+        } catch {
+            return lastPart;
+        }
+    }
+}
+
+function getCertificateFileName(item: CertificateItem) {
+    return item.fileName || getFileNameFromUrl(item.badgeLink) || item.title || "Attached file";
+}
+
+function isImageFileUrl(url: string) {
+    return /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(String(url ?? ""));
+}
+
+function isPdfFileUrl(url: string) {
+    return /\.pdf(\?.*)?$/i.test(String(url ?? ""));
 }
 
 function filesToUploadItems(fileList: FileList | null) {
@@ -199,13 +301,13 @@ function buildEducationLabel(item: any) {
 function toEducationItem(item: any, index: number): EducationItem {
     return {
         id: item?.id || makeId(`education-${index}`),
-        school: String(item?.school ?? item?.institution ?? item?.university ?? item?.facultyschool ?? "").trim(),
-        degree: String(item?.degree ?? item?.degreeLevel ?? item?.degree_level ?? "").trim(),
-        faculty: String(item?.faculty ?? "").trim(),
-        fieldOfStudy: String(item?.fieldOfStudy ?? item?.major ?? item?.field_of_study ?? "").trim(),
-        startYear: String(item?.startYear ?? item?.start_year ?? "").trim(),
-        endYear: String(item?.endYear ?? item?.end_year ?? "").trim(),
-        gpa: String(item?.gpa ?? "").trim(),
+        school: String(item?.school ?? item?.School ?? item?.institution ?? item?.Institution ?? item?.university ?? item?.University ?? item?.facultyschool ?? "").trim(),
+        degree: String(item?.degree ?? item?.Degree ?? item?.degreeLevel ?? item?.DegreeLevel ?? item?.degree_level ?? "").trim(),
+        faculty: String(item?.faculty ?? item?.Faculty ?? "").trim(),
+        fieldOfStudy: String(item?.fieldOfStudy ?? item?.FieldOfStudy ?? item?.major ?? item?.Major ?? item?.field_of_study ?? "").trim(),
+        startYear: String(item?.startYear ?? item?.StartYear ?? item?.start_year ?? "").trim(),
+        endYear: String(item?.endYear ?? item?.EndYear ?? item?.end_year ?? "").trim(),
+        gpa: String(item?.gpa ?? item?.GPA ?? "").trim(),
     };
 }
 
@@ -237,13 +339,27 @@ function toSkillsPayload(items: SkillItem[]) {
 }
 
 function toCertificatesPayload(items: CertificateItem[]) {
-    return items.map((item) => ({
-        name: item.title.trim(),
-        type: item.itemType,
-        badgeLink: item.badgeLink,
-        fromSystem: item.source === "platform",
-        enable: item.isSelected,
-    }));
+    return items.map((item) => {
+        const fileUrl = toPublicAssetUrl(item.badgeLink);
+        const fileName = item.fileName || getFileNameFromUrl(fileUrl);
+
+        return {
+            name: item.title.trim(),
+            title: item.title.trim(),
+            type: item.itemType,
+            itemType: item.itemType,
+            badgeLink: fileUrl,
+            badge_link: fileUrl,
+            fileUrl,
+            file_url: fileUrl,
+            fileName,
+            file_name: fileName,
+            fromSystem: item.source === "platform",
+            source: item.source,
+            enable: item.isSelected,
+            isSelected: item.isSelected,
+        };
+    });
 }
 
 function toExperiencesPayload(enabledItems: ExperienceItem[], allPlatform: ExperienceItem[] = []) {
@@ -348,6 +464,7 @@ export default function PortfolioPage() {
     // ]);
     const [certificateForm, setCertificateForm] = useState<CertificateFormState>(emptyCertificateForm);
     const [editingCertificateIndex, setEditingCertificateIndex] = useState<number | null>(null);
+    const [activeCertificatePreviewId, setActiveCertificatePreviewId] = useState<string | null>(null);
 
     // const [experiences, setExperiences] = useState<ExperienceItem[]>([
     //     {
@@ -424,6 +541,35 @@ export default function PortfolioPage() {
         [certificates]
     );
 
+    function toggleCertificatePreview(item: CertificateItem) {
+        if (!item.badgeLink) return;
+        setActiveCertificatePreviewId((current) => (current === item.id ? null : item.id));
+    }
+
+    function renderCertificateFilePreview(item: CertificateItem) {
+        if (!item.badgeLink) return null;
+
+        return (
+            <div className={styles.inlineFilePreview} onClick={(event) => event.stopPropagation()}>
+                <div className={styles.inlineFileHeader}>
+                    <img src={getSourceIcon(item.source)} alt={getSourceLabel(item.source)} className={styles.inlineSourceIcon} />
+                    <span className={styles.inlineFileName}>{getCertificateFileName(item)}</span>
+                    <a className={styles.inlineFileOpenLink} href={item.badgeLink} target="_blank" rel="noreferrer">
+                        Open
+                    </a>
+                </div>
+
+                {isImageFileUrl(item.badgeLink) ? (
+                    <img src={item.badgeLink} alt={item.title} className={styles.inlineFileImage} />
+                ) : isPdfFileUrl(item.badgeLink) ? (
+                    <iframe src={item.badgeLink} title={item.title} className={styles.inlineFileFrame} />
+                ) : (
+                    <div className={styles.inlineFileFallback}>Preview is not available for this file type. Click Open to view the file.</div>
+                )}
+            </div>
+        );
+    }
+
     useEffect(() => {
         if (!showSave) return;
         const timer = window.setTimeout(() => setShowSave(false), 1600);
@@ -462,7 +608,6 @@ export default function PortfolioPage() {
     }
 
     async function onPhotoChange(e: ChangeEvent<HTMLInputElement>) {
-    async function onPhotoChange(e: ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0];
         if (!file) return;
         e.target.value = "";
@@ -470,7 +615,7 @@ export default function PortfolioPage() {
         // Show local preview immediately
         const blobUrl = URL.createObjectURL(file);
         setPhotoUrl((prev) => {
-            if (prev.startsWith("blob:")) URL.revokeObjectURL(prev);
+            if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
             return blobUrl;
         });
 
@@ -481,15 +626,16 @@ export default function PortfolioPage() {
             formData.append("bucketName", "vcep-assets-dev");
             formData.append("folderName", "student-profile");
 
-            const res = await fetch("/api/s3", { method: "PUT", body: formData });
+            const res = await fetch("/api/s3", { method: "PUT", body: formData, credentials: "include" });
             const result = await res.json();
             if (!res.ok || !result.ok) throw new Error(result.error || "Upload failed");
 
-            const s3Url: string = result.result.url;
+            const s3Url = extractUploadedAssetUrl(result);
+            if (!s3Url) throw new Error("Upload succeeded but file URL was not returned");
 
             // Replace blob preview with permanent S3 URL
             setPhotoUrl((prev) => {
-                if (prev.startsWith("blob:")) URL.revokeObjectURL(prev);
+                if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
                 return s3Url;
             });
 
@@ -682,15 +828,28 @@ export default function PortfolioPage() {
     }
 
     async function onSelectPlatformSkill(option: SkillItem) {
-        const exists = skills.some(
-            (item) =>
-                item.name.trim().toLowerCase() === option.name.trim().toLowerCase() &&
-                item.kind === option.kind &&
-                item.source === "platform"
-        );
-        if (exists) return;
+        const optionName = option.name.trim().toLowerCase();
 
-        const nextList = [...skills, { ...option, id: makeId("skill"), isSelected: true }];
+        const existingIndex = skills.findIndex(
+            (item) =>
+                item.source === "platform" &&
+                item.name.trim().toLowerCase() === optionName &&
+                item.kind === option.kind
+        );
+
+        const nextList: SkillItem[] = existingIndex >= 0
+            ? skills.map((item, index) =>
+                index === existingIndex ? { ...item, isSelected: true } : item
+            )
+            : [
+                ...skills,
+                {
+                    ...option,
+                    id: option.id || makeId("skill"),
+                    source: "platform",
+                    isSelected: true,
+                },
+            ];
 
         try {
             await savePortfolioSection("skills", toSkillsPayload(nextList));
@@ -711,7 +870,13 @@ export default function PortfolioPage() {
         const item = certificates[index];
         if (!item) return;
         setEditingCertificateIndex(index);
-        setCertificateForm({ title: item.title, date: item.date, itemType: item.itemType, badgeLink: item.badgeLink, uploadedFileName: "" });
+        setCertificateForm({
+            title: item.title,
+            date: item.date,
+            itemType: item.itemType,
+            badgeLink: item.badgeLink,
+            uploadedFileName: item.fileName || getFileNameFromUrl(item.badgeLink),
+        });
         setEditorMode("certificateForm");
     }
 
@@ -723,7 +888,8 @@ export default function PortfolioPage() {
                 title: certificateForm.title.trim() || "New Certificate",
                 date: certificateForm.date.trim() || "DD/MM/YYYY",
                 itemType: certificateForm.itemType,
-                badgeLink: certificateForm.badgeLink,
+                badgeLink: toPublicAssetUrl(certificateForm.badgeLink),
+                fileName: certificateForm.uploadedFileName || existingItem?.fileName || getFileNameFromUrl(certificateForm.badgeLink),
                 source: existingItem?.source ?? "upload",
                 isSelected: existingItem?.isSelected ?? true,
             };
@@ -859,12 +1025,13 @@ export default function PortfolioPage() {
             formData.append("bucketName", "vcep-assets-dev");
             formData.append("folderName", "student-certificates");
 
-            const res = await fetch("/api/s3", { method: "PUT", body: formData });
+            const res = await fetch("/api/s3", { method: "PUT", body: formData, credentials: "include" });
             const result = await res.json();
             if (!res.ok || !result.ok) throw new Error(result.error || "Upload failed");
 
-            const s3Url: string = result.result.url;
-            setCertificateForm((prev) => ({ ...prev, badgeLink: s3Url }));
+            const s3Url = extractUploadedAssetUrl(result);
+            if (!s3Url) throw new Error("Upload succeeded but file URL was not returned");
+            setCertificateForm((prev) => ({ ...prev, badgeLink: s3Url, uploadedFileName: file.name }));
         } catch (error: any) {
             console.error("Certificate file upload failed:", error);
             alert(error?.message || "Failed to upload file");
@@ -909,7 +1076,10 @@ export default function PortfolioPage() {
             }
 
             if (deleteTarget === "skills") {
-                const nextList = skills.filter((_, i) => i !== deleteIndex);
+                const item = skills[deleteIndex];
+                const nextList = item?.source === "platform"
+                    ? skills.map((skill, i) => (i === deleteIndex ? { ...skill, isSelected: false } : skill))
+                    : skills.filter((_, i) => i !== deleteIndex);
                 await savePortfolioSection("skills", toSkillsPayload(nextList));
                 setSkills(nextList);
             }
@@ -951,12 +1121,21 @@ export default function PortfolioPage() {
         setIsLoading(true);
 
         try {
-            const res = await fetch("/api/student/portfolio", {
-                method: "GET",
-                cache: "no-store",
-            });
+            const [res, dashboardRes] = await Promise.all([
+                fetch("/api/student/portfolio", {
+                    method: "GET",
+                    credentials: "include",
+                    cache: "no-store",
+                }),
+                fetch("/api/student", {
+                    method: "GET",
+                    credentials: "include",
+                    cache: "no-store",
+                }).catch(() => null),
+            ]);
 
             const result = await res.json();
+            const dashboardResult = dashboardRes?.ok ? await dashboardRes.json().catch(() => null) : null;
 
             console.log("result: ", result);
 
@@ -965,27 +1144,41 @@ export default function PortfolioPage() {
             }
 
             const portfolio = result?.data ?? {};
-            const info = portfolio?.student_info ?? {};
+            const info = portfolio?.student_info ?? portfolio?.studentInfo ?? portfolio?.info ?? portfolio?.Info ?? {};
+            const dashboardInfo =
+                dashboardResult?.data?.student_info ??
+                dashboardResult?.data?.studentInfo ??
+                dashboardResult?.data?.student ??
+                dashboardResult?.data ??
+                {};
 
             const nextForm = {
-                firstName: info.first_name || "",
-                lastName: info.last_name || "",
-                birthDate: info.birth_date || "",
-                phone: info.phone || "",
-                email: info.email || "",
-                address: info.address || "",
-                aboutMe: info.about_me || "",
+                firstName: info.first_name || info.firstName || info.FirstName || "",
+                lastName: info.last_name || info.lastName || info.LastName || "",
+                birthDate: info.birth_date || info.birthDate || info.BirthDate || "",
+                phone: info.phone || info.Phone || "",
+                email: info.email || info.Email || "",
+                address: info.address || info.Address || "",
+                aboutMe: info.about_me || info.aboutMe || info.AboutMe || "",
             };
 
             setForm(nextForm);
             setLoadedForm(nextForm);
 
             setPhotoUrl(
-                String(
-                    info.profile_image_url ||
-                    info.avatar_image_url ||
-                    ""
-                ).trim()
+                toPublicAssetUrl(
+                    pickString(
+                        info.profile_image_url,
+                        info.profileImageUrl,
+                        info.ProfileImageUrl,
+                        info.avatar_image_url,
+                        info.avatarImageUrl,
+                        dashboardInfo.profile_image_url,
+                        dashboardInfo.profileImageUrl,
+                        dashboardInfo.avatar_image_url,
+                        dashboardInfo.avatarImageUrl
+                    )
+                )
             );
 
             setEducationList(
@@ -1027,7 +1220,8 @@ export default function PortfolioPage() {
                             title: item.title || "",
                             date: normalizeDate(item.date),
                             itemType: (item.itemType === "badge" ? "badge" : "certificate") as "certificate" | "badge",
-                            badgeLink: item.badgeLink || "",
+                            badgeLink: toPublicAssetUrl(pickString(item.badgeLink, item.badge_link, item.badgeUrl, item.badge_url, item.certificateLink, item.certificate_link, item.fileUrl, item.file_url, item.externalWebsite, item.external_website, item.url, item.link)),
+                            fileName: pickString(item.fileName, item.file_name, getFileNameFromUrl(pickString(item.badgeLink, item.badge_link, item.badgeUrl, item.badge_url, item.certificateLink, item.certificate_link, item.fileUrl, item.file_url, item.externalWebsite, item.external_website, item.url, item.link))),
                             source: normalizeSource(item.source ?? (item.fromSystem === true ? "platform" : "upload")),
                             isSelected: typeof item.isSelected === "boolean"
                                 ? item.isSelected
@@ -1404,24 +1598,52 @@ export default function PortfolioPage() {
                                             if (item.source === "platform" && !item.isSelected) return null;
 
                                             return (
-                                                <div key={item.id} className={styles.sectionEditorRow}>
-                                                <div className={styles.sectionEditorTextWrap}>
-                                                    <div className={styles.sectionEditorTextBlock}>
-                                                        <div className={styles.sectionEditorTitle}>{item.title}</div>
-                                                        <div className={styles.sectionEditorMeta}>
-                                                            {item.date} • {item.itemType === "badge" ? "Badge" : "Certificate"}
-                                                            {item.badgeLink ? " • File uploaded" : ""}
+                                                <div key={item.id} className={styles.certificateEditorItemWrap}>
+                                                    <div className={styles.sectionEditorRow}>
+                                                        <div
+                                                            className={styles.sectionEditorTextWrap}
+                                                            role={item.badgeLink ? "button" : undefined}
+                                                            tabIndex={item.badgeLink ? 0 : undefined}
+                                                            onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                toggleCertificatePreview(item);
+                                                            }}
+                                                            onKeyDown={(event) => {
+                                                                if (event.key === "Enter" || event.key === " ") {
+                                                                    event.preventDefault();
+                                                                    toggleCertificatePreview(item);
+                                                                }
+                                                            }}
+                                                            title={item.badgeLink ? "Click to preview file" : undefined}
+                                                        >
+                                                            <img src={getSourceIcon(item.source)} alt={getSourceLabel(item.source)} className={styles.inlineSourceIcon} />
+                                                            <div className={styles.sectionEditorTextBlock}>
+                                                                <div className={styles.sectionEditorTitle}>{item.title}</div>
+                                                                <div className={styles.sectionEditorMeta}>
+                                                                    {item.date} • {item.itemType === "badge" ? "Badge" : "Certificate"}
+                                                                    {item.badgeLink ? " • " + getCertificateFileName(item) : ""}
+                                                                </div>
+                                                            </div>
+
+                                                            {item.badgeLink && (
+                                                                <div className={styles.fileHoverPopup}>
+                                                                    <div className={styles.filePopupTitle}>Attached file</div>
+                                                                    <div className={styles.filePopupName}>{getCertificateFileName(item)}</div>
+                                                                    <div className={styles.filePopupHint}>Click this item to preview</div>
+                                                                </div>
+                                                            )}
                                                         </div>
+
+                                                        <button type="button" className={styles.educationEditBtn} onClick={() => onEditCertificate(index)}>
+                                                            <img src="/images/icons/button03-icon.png" alt="Edit" className={styles.educationBtnIcon} />
+                                                        </button>
+
+                                                        <button type="button" className={styles.educationDeleteBtn} onClick={() => askDelete("certificate", index)}>
+                                                            <img src="/images/icons/button04-icon.png" alt="Delete" className={styles.educationBtnIcon} />
+                                                        </button>
                                                     </div>
-                                                </div>
 
-                                                <button type="button" className={styles.educationEditBtn} onClick={() => onEditCertificate(index)}>
-                                                    <img src="/images/icons/button03-icon.png" alt="Edit" className={styles.educationBtnIcon} />
-                                                </button>
-
-                                                <button type="button" className={styles.educationDeleteBtn} onClick={() => askDelete("certificate", index)}>
-                                                    <img src="/images/icons/button04-icon.png" alt="Delete" className={styles.educationBtnIcon} />
-                                                </button>
+                                                    {activeCertificatePreviewId === item.id && renderCertificateFilePreview(item)}
                                                 </div>
                                             );
                                         })}
@@ -1515,7 +1737,7 @@ export default function PortfolioPage() {
                             </div>
 
                             <div className={styles.confirmButton}>
-                                <button type="button" className={styles.okButtonIcon} onClick={onSaveCertificateForm} disabled={isSaving}>
+                                <button type="button" className={styles.okButtonIcon} onClick={onSaveCertificateForm} disabled={isSaving || isUploadingCertFile}>
                                     <img src="/images/icons/button01-icon.png" alt="Save" className={styles.confirmBtnIcon} />
                                 </button>
 
@@ -1683,7 +1905,7 @@ export default function PortfolioPage() {
                             <input ref={fileInputRef} type="file" accept="image/*" className={styles.hiddenInput} onChange={onPhotoChange} />
 
                             <div className={styles.aboutCard} onClick={openPersonalEditor}>
-                                <div className={styles.aboutName}>{fullName || "John Doe"}</div>
+                                <div className={styles.aboutName}>{fullName || "Your Name"}</div>
                                 <div className={styles.aboutText}>{form.aboutMe}</div>
 
                                 <div className={styles.infoGrid}>
@@ -1745,8 +1967,35 @@ export default function PortfolioPage() {
                                         <div className={styles.blockSubTitle}>Certificates</div>
                                         <div className={styles.list}>
                                             {visibleCertificates.filter((c) => c.itemType === "certificate").map((item) => (
-                                                <div key={item.id} className={styles.listItem}>
-                                                    <span className={styles.listText}>- {item.title} ({item.date})</span>
+                                                <div key={item.id} className={styles.fileListItemWrap}>
+                                                    <div
+                                                        className={styles.fileListItem}
+                                                        role={item.badgeLink ? "button" : undefined}
+                                                        tabIndex={item.badgeLink ? 0 : undefined}
+                                                        onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            toggleCertificatePreview(item);
+                                                        }}
+                                                        onKeyDown={(event) => {
+                                                            if (event.key === "Enter" || event.key === " ") {
+                                                                event.preventDefault();
+                                                                event.stopPropagation();
+                                                                toggleCertificatePreview(item);
+                                                            }
+                                                        }}
+                                                        title={item.badgeLink ? "Click to preview file" : undefined}
+                                                    >
+                                                        <img src={getSourceIcon(item.source)} alt={getSourceLabel(item.source)} className={styles.downloadIconImg} />
+                                                        <span className={styles.listText}>- {item.title} {item.date ? "(" + item.date + ")" : ""}</span>
+                                                        {item.badgeLink && (
+                                                            <div className={styles.fileHoverPopup}>
+                                                                <div className={styles.filePopupTitle}>{getSourceLabel(item.source)}</div>
+                                                                <div className={styles.filePopupName}>{getCertificateFileName(item)}</div>
+                                                                <div className={styles.filePopupHint}>Click this item to preview</div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    {activeCertificatePreviewId === item.id && renderCertificateFilePreview(item)}
                                                 </div>
                                             ))}
                                         </div>
@@ -1757,8 +2006,35 @@ export default function PortfolioPage() {
                                         <div className={styles.blockSubTitle}>Badges</div>
                                         <div className={styles.list}>
                                             {visibleCertificates.filter((c) => c.itemType === "badge").map((item) => (
-                                                <div key={item.id} className={styles.listItem}>
-                                                    <span className={styles.listText}>- {item.title} ({item.date})</span>
+                                                <div key={item.id} className={styles.fileListItemWrap}>
+                                                    <div
+                                                        className={styles.fileListItem}
+                                                        role={item.badgeLink ? "button" : undefined}
+                                                        tabIndex={item.badgeLink ? 0 : undefined}
+                                                        onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            toggleCertificatePreview(item);
+                                                        }}
+                                                        onKeyDown={(event) => {
+                                                            if (event.key === "Enter" || event.key === " ") {
+                                                                event.preventDefault();
+                                                                event.stopPropagation();
+                                                                toggleCertificatePreview(item);
+                                                            }
+                                                        }}
+                                                        title={item.badgeLink ? "Click to preview file" : undefined}
+                                                    >
+                                                        <img src={getSourceIcon(item.source)} alt={getSourceLabel(item.source)} className={styles.downloadIconImg} />
+                                                        <span className={styles.listText}>- {item.title} {item.date ? "(" + item.date + ")" : ""}</span>
+                                                        {item.badgeLink && (
+                                                            <div className={styles.fileHoverPopup}>
+                                                                <div className={styles.filePopupTitle}>{getSourceLabel(item.source)}</div>
+                                                                <div className={styles.filePopupName}>{getCertificateFileName(item)}</div>
+                                                                <div className={styles.filePopupHint}>Click this item to preview</div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    {activeCertificatePreviewId === item.id && renderCertificateFilePreview(item)}
                                                 </div>
                                             ))}
                                         </div>
@@ -1815,4 +2091,4 @@ export default function PortfolioPage() {
             )}
         </div>
     );
-}}
+}

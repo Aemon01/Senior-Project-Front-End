@@ -148,6 +148,8 @@ type ParticipantPortfolioData = {
     itemType: "certificate" | "badge";
     source: PortfolioSource;
     isSelected?: boolean;
+    badgeLink?: string;
+    fileName?: string;
   }>;
   experiences: Array<{
     id: string;
@@ -423,6 +425,8 @@ export default function OrgDashboardPage() {
     useState(false);
   const [participantPortfolioError, setParticipantPortfolioError] =
     useState("");
+  const [activeParticipantCertificatePreviewId, setActiveParticipantCertificatePreviewId] =
+    useState<string | null>(null);
   const [activityRows, setActivityRows] = useState<OrgActivityRow[]>([]);
   const [participantBars, setParticipantBars] = useState<GraphBar[]>([]);
   const [skillBars, setSkillBars] = useState<GraphBar[]>([]);
@@ -595,6 +599,115 @@ export default function OrgDashboardPage() {
     return "platform";
   }
 
+  function normalizeSelectedFlag(item: any) {
+    const candidates = [
+      item?.isSelected,
+      item?.is_selected,
+      item?.selected,
+      item?.enable,
+      item?.Enable,
+      item?.enabled,
+    ];
+
+    for (const value of candidates) {
+      if (typeof value === "boolean") return value;
+      if (typeof value === "string") {
+        const normalized = value.trim().toLowerCase();
+        if (["true", "1", "yes", "y"].includes(normalized)) return true;
+        if (["false", "0", "no", "n"].includes(normalized)) return false;
+      }
+      if (typeof value === "number") return value !== 0;
+    }
+
+    return true;
+  }
+
+  function normalizeItemSource(item: any): PortfolioSource {
+    if (typeof item?.fromSystem === "boolean") return item.fromSystem ? "platform" : "upload";
+    if (typeof item?.from_system === "boolean") return item.from_system ? "platform" : "upload";
+    if (typeof item?.FromSystem === "boolean") return item.FromSystem ? "platform" : "upload";
+    return item?.source ?? item?.origin ?? item?.item_source ?? item?.created_by_type ?? "platform";
+  }
+
+  function pickText(...values: unknown[]) {
+    for (const value of values) {
+      const text = String(value ?? "").trim();
+      if (text && text !== "null" && text !== "undefined") return text;
+    }
+    return "";
+  }
+
+
+  function normalizeDate(value: unknown) {
+    const text = pickText(value);
+    if (!text) return "";
+
+    // ถ้าเป็นปีอย่างเดียว เช่น 2026 ให้คืนเป็นปี ไม่ต้อง parse เป็นวันที่
+    if (/^\\d{4}$/.test(text)) return text;
+
+    // ถ้าเป็นช่วงปี เช่น 2022 - 2026 ให้คืนค่าตามเดิม
+    if (/^\\d{4}\\s*-\\s*\\d{4}$/.test(text)) return text;
+
+    const date = new Date(text);
+    if (Number.isNaN(date.getTime())) return text;
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  }
+
+  function safeObjectLike(value: any) {
+    if (!value) return {};
+    if (typeof value === "object" && !Array.isArray(value)) return value;
+    if (typeof value === "string") {
+      try {
+        const parsed = JSON.parse(value);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+      } catch {}
+    }
+    return {};
+  }
+
+  function unwrapParticipantPortfolioRoot(value: any, stdId?: string) {
+    const candidate = value?.data ?? value?.portfolio ?? value ?? {};
+
+    if (
+      candidate?.info ||
+      candidate?.Info ||
+      candidate?.student_info ||
+      candidate?.studentInfo ||
+      candidate?.education ||
+      candidate?.Education ||
+      candidate?.skills ||
+      candidate?.Skills ||
+      candidate?.certificates ||
+      candidate?.Certificates ||
+      candidate?.experience ||
+      candidate?.Experience ||
+      candidate?.experiences
+    ) {
+      return candidate;
+    }
+
+    if (stdId && candidate?.[stdId]) return candidate[stdId];
+
+    if (candidate?.std_id && typeof candidate.std_id === "object" && !Array.isArray(candidate.std_id)) {
+      return candidate.std_id;
+    }
+
+    if (candidate?.portfolio && typeof candidate.portfolio === "object" && !Array.isArray(candidate.portfolio)) {
+      return candidate.portfolio;
+    }
+
+    const firstObjectValue = Object.values(candidate).find(
+      (item) => item && typeof item === "object" && !Array.isArray(item),
+    );
+
+    return (firstObjectValue as any) ?? candidate;
+  }
+
   function getPortfolioSourceIcon(source?: PortfolioSource) {
     return normalizePortfolioSource(source) === "upload"
       ? "/images/icons/sign01-icon.png"
@@ -622,32 +735,21 @@ export default function OrgDashboardPage() {
 
   function normalizeEducationItems(value: any): ParticipantPortfolioData["education"] {
     if (typeof value === "string" && value.trim()) {
-      return [
-        {
-          id: "education-text-0",
-          school: value.trim(),
-          degree: "",
-          faculty: "",
-          fieldOfStudy: "",
-          startYear: "",
-          endYear: "",
-          gpa: "",
-        },
-      ];
+      return [{ id: "education-text-0", school: value.trim(), degree: "", faculty: "", fieldOfStudy: "", startYear: "", endYear: "", gpa: "" }];
     }
-
     if (!Array.isArray(value)) return [];
-
-    return value.map((item: any, index: number) => ({
-      id: makePortfolioId("education", item, index),
-      school: String(item?.school ?? item?.university ?? item?.institution ?? item?.title ?? "").trim(),
-      degree: String(item?.degree ?? item?.education_level ?? "").trim(),
-      faculty: String(item?.faculty ?? "").trim(),
-      fieldOfStudy: String(item?.fieldOfStudy ?? item?.field_of_study ?? item?.major ?? item?.department ?? "").trim(),
-      startYear: String(item?.startYear ?? item?.start_year ?? item?.from ?? "").trim(),
-      endYear: String(item?.endYear ?? item?.end_year ?? item?.to ?? "").trim(),
-      gpa: String(item?.gpa ?? "").trim(),
-    }));
+    return value
+      .map((item: any, index: number) => ({
+        id: makePortfolioId("education", item, index),
+        school: pickText(item?.school, item?.School, item?.university, item?.University, item?.institution, item?.Institution, item?.educational_institution, item?.facultyschool, item?.title),
+        degree: pickText(item?.degree, item?.Degree, item?.degreeLevel, item?.DegreeLevel, item?.degree_level, item?.education_level),
+        faculty: pickText(item?.faculty, item?.Faculty),
+        fieldOfStudy: pickText(item?.fieldOfStudy, item?.FieldOfStudy, item?.field_of_study, item?.major, item?.Major, item?.department),
+        startYear: pickText(item?.startYear, item?.StartYear, item?.start_year, item?.from),
+        endYear: pickText(item?.endYear, item?.EndYear, item?.end_year, item?.to),
+        gpa: pickText(item?.gpa, item?.GPA),
+      }))
+      .filter((item) => Boolean(item.school || item.degree || item.faculty || item.fieldOfStudy));
   }
 
   function normalizeSkillItems(root: any): ParticipantPortfolioData["skills"] {
@@ -656,23 +758,28 @@ export default function OrgDashboardPage() {
       { value: normalizeRawList(root?.softSkills, root?.soft_skills), kind: "soft" },
       { value: normalizeRawList(root?.technicalSkills, root?.technical_skills), kind: "technical" },
     ];
-
+    const seen = new Set<string>();
     return skillGroups.flatMap(({ value, kind }) =>
-      value.map((item: any, index: number) => {
-        const category = String(item?.kind ?? item?.category ?? item?.skill_category ?? item?.type ?? "").toLowerCase();
-        const inferredKind: "soft" | "technical" =
-          kind ?? (category.includes("soft") ? "soft" : "technical");
-
-        return {
-          id: makePortfolioId(`skill-${inferredKind}`, item, index),
-          name:
-            String(item?.name ?? item?.title ?? item?.skill_name ?? item?.skillName ?? "").trim() ||
-            "Skill",
-          kind: inferredKind,
-          source: item?.source ?? item?.origin ?? item?.item_source ?? item?.created_by_type ?? "platform",
-          isSelected: item?.isSelected ?? item?.is_selected ?? item?.selected,
-        };
-      }),
+      value
+        .map((item: any, index: number) => {
+          const category = String(item?.kind ?? item?.category ?? item?.Category ?? item?.skill_category ?? item?.type ?? "").toLowerCase();
+          const inferredKind: "soft" | "technical" = kind ?? (category.includes("soft") ? "soft" : "technical");
+          const name = pickText(item?.name, item?.Name, item?.title, item?.skill_name, item?.skillName);
+          return {
+            id: makePortfolioId(`skill-${inferredKind}`, item, index),
+            name: name || "Skill",
+            kind: inferredKind,
+            source: normalizeItemSource(item),
+            isSelected: normalizeSelectedFlag(item),
+          };
+        })
+        .filter((item) => {
+          if (!item.name) return false;
+          const key = `${item.name.toLowerCase()}|${item.kind}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return item.isSelected !== false;
+        }),
     );
   }
 
@@ -680,44 +787,44 @@ export default function OrgDashboardPage() {
     const certificates = normalizeRawList(root?.certificates, root?.certificate, root?.Certificates).map(
       (item: any, index: number) => ({
         id: makePortfolioId("certificate", item, index),
-        title:
-          String(item?.title ?? item?.name ?? item?.certificate_name ?? item?.certificateName ?? "").trim() ||
-          "Certificate",
-        date: String(item?.date ?? item?.issued_at ?? item?.year ?? "").trim(),
-        itemType: "certificate" as const,
-        source: item?.source ?? item?.origin ?? item?.item_source ?? item?.created_by_type ?? "platform",
-        isSelected: item?.isSelected ?? item?.is_selected ?? item?.selected,
+        title: pickText(item?.title, item?.name, item?.Name, item?.certificate_name, item?.certificateName) || "Certificate",
+        date: normalizeDate(item?.date ?? item?.issued_at ?? item?.issue_date ?? item?.year),
+        itemType: String(item?.itemType ?? item?.item_type ?? item?.type ?? "certificate").toLowerCase() === "badge" ? ("badge" as const) : ("certificate" as const),
+        source: normalizeItemSource(item),
+        isSelected: normalizeSelectedFlag(item),
+        badgeLink: normalizeS3ImageUrl(pickText(item?.badgeLink, item?.badge_link, item?.badgeUrl, item?.badge_url, item?.certificateLink, item?.certificate_link, item?.fileUrl, item?.file_url, item?.url, item?.externalWebsite, item?.external_website)),
+        fileName: pickText(item?.fileName, item?.file_name),
       }),
     );
-
     const badges = normalizeRawList(root?.badges, root?.badge, root?.Badges).map((item: any, index: number) => ({
       id: makePortfolioId("badge", item, index),
-      title: String(item?.title ?? item?.name ?? item?.badge_name ?? item?.badgeName ?? "").trim() || "Badge",
-      date: String(item?.date ?? item?.issued_at ?? item?.year ?? "").trim(),
+      title: pickText(item?.title, item?.name, item?.Name, item?.badge_name, item?.badgeName) || "Badge",
+      date: normalizeDate(item?.date ?? item?.issued_at ?? item?.issue_date ?? item?.year),
       itemType: "badge" as const,
-      source: item?.source ?? item?.origin ?? item?.item_source ?? item?.created_by_type ?? "platform",
-      isSelected: item?.isSelected ?? item?.is_selected ?? item?.selected,
+      source: normalizeItemSource(item),
+      isSelected: normalizeSelectedFlag(item),
+      badgeLink: normalizeS3ImageUrl(pickText(item?.badgeLink, item?.badge_link, item?.badgeUrl, item?.badge_url, item?.certificateLink, item?.certificate_link, item?.fileUrl, item?.file_url, item?.url, item?.externalWebsite, item?.external_website)),
+      fileName: pickText(item?.fileName, item?.file_name),
     }));
-
-    return [...certificates, ...badges];
+    return [...certificates, ...badges].filter((item) => item.isSelected !== false);
   }
 
   function normalizeExperienceItems(root: any): ParticipantPortfolioData["experiences"] {
-    return normalizeRawList(
-      root?.experiences,
-      root?.experience,
-      root?.Experience,
-      root?.activities,
-      root?.Activities,
-    ).map((item: any, index: number) => ({
-      id: makePortfolioId("experience", item, index),
-      period: String(item?.period ?? item?.year ?? item?.date ?? item?.activity_year ?? "").trim(),
-      title:
-        String(item?.title ?? item?.name ?? item?.activity_name ?? item?.certificate_name ?? "").trim() ||
-        "Activity",
-      description: String(item?.description ?? item?.detail ?? item?.activity_detail ?? item?.subtitle ?? "").trim(),
-      source: item?.source ?? item?.origin ?? item?.item_source ?? item?.created_by_type ?? "platform",
-    }));
+    return normalizeRawList(root?.experiences, root?.experience, root?.Experience, root?.activities, root?.Activities)
+      .map((item: any, index: number) => {
+        const start = pickText(item?.startYear, item?.StartYear, item?.start_year);
+        const end = pickText(item?.endYear, item?.EndYear, item?.end_year);
+        const period = pickText(item?.period, item?.year, item?.date, item?.activity_year) || (start || end ? `${start || "-"} - ${end || "Present"}` : "");
+        return {
+          id: makePortfolioId("experience", item, index),
+          period,
+          title: pickText(item?.title, item?.name, item?.activity_name, item?.topic, item?.Topic, item?.certificate_name) || "Activity",
+          description: pickText(item?.description, item?.Description, item?.detail, item?.activity_detail, item?.subtitle),
+          source: normalizeItemSource(item),
+          isSelected: normalizeSelectedFlag(item),
+        } as any;
+      })
+      .filter((item: any) => item.isSelected !== false);
   }
 
 
@@ -733,8 +840,8 @@ export default function OrgDashboardPage() {
     data: any,
     fallback: ParticipantItem,
   ): ParticipantPortfolioData {
-    const root = data?.data ?? data?.portfolio ?? data ?? {};
-    const info =
+    const root = unwrapParticipantPortfolioRoot(data, fallback.id);
+    const rawInfo =
       root?.studentInfo ??
       root?.student_info ??
       root?.student ??
@@ -744,9 +851,10 @@ export default function OrgDashboardPage() {
       root?.data?.studentInfo ??
       root?.data?.student_info ??
       {};
+    const info = safeObjectLike(rawInfo);
 
-    const firstName = String(info?.firstName ?? info?.first_name ?? info?.FirstName ?? info?.name?.split?.(" ")?.[0] ?? "").trim();
-    const lastName = String(info?.lastName ?? info?.last_name ?? info?.LastName ?? info?.name?.split?.(" ")?.slice?.(1)?.join?.(" ") ?? "").trim();
+    const firstName = pickText(info?.firstName, info?.first_name, info?.FirstName, info?.name?.split?.(" ")?.[0]);
+    const lastName = pickText(info?.lastName, info?.last_name, info?.LastName, info?.name?.split?.(" ")?.slice?.(1)?.join?.(" "));
     const fallbackNames = fallback.name.split(/\s+/).filter(Boolean);
     const resolvedFirstName = firstName || fallbackNames[0] || fallback.name;
     const resolvedLastName = lastName || fallbackNames.slice(1).join(" ");
@@ -776,10 +884,10 @@ export default function OrgDashboardPage() {
       studentInfo: {
         firstName: resolvedFirstName,
         lastName: resolvedLastName,
-        phone: String(info?.phone ?? info?.Phone ?? info?.phone_number ?? fallback.phone ?? "").trim(),
-        email: String(info?.email ?? info?.Email ?? fallback.email ?? "").trim(),
-        address: String(info?.address ?? info?.Address ?? info?.location ?? fallback.address ?? "").trim(),
-        aboutMe: String(info?.aboutMe ?? info?.about_me ?? info?.AboutMe ?? info?.about ?? info?.bio ?? root?.bio ?? fallback.about ?? "").trim(),
+        phone: pickText(info?.phone, info?.Phone, info?.phone_number, fallback.phone),
+        email: pickText(info?.email, info?.Email, fallback.email),
+        address: pickText(info?.address, info?.Address, info?.location, fallback.address),
+        aboutMe: pickText(info?.aboutMe, info?.about_me, info?.AboutMe, info?.about, info?.bio, root?.bio, fallback.about),
         profileImageUrl: normalizeS3ImageUrl(rawPhoto) || fallback.profileImage,
       },
       education: normalizeEducationItems(educationValue),
@@ -796,17 +904,57 @@ export default function OrgDashboardPage() {
   }
 
   function formatEducationLine(item: ParticipantPortfolioData["education"][number]) {
-    const title = [item.school, item.faculty, item.fieldOfStudy].filter(Boolean).join(" • ");
-    const year = [item.startYear, item.endYear].filter(Boolean).join(" - ");
-    const degree = item.degree ? ` (${item.degree})` : "";
-    const gpa = item.gpa ? ` • GPA ${item.gpa}` : "";
-    return `${title || "Education"}${degree}${year ? ` • ${year}` : ""}${gpa}`;
+    const school = item.school || "Education";
+    const yearText = item.startYear || item.endYear ? ` (${item.startYear || "-"} - ${item.endYear || "Present"})` : "";
+    const gpaText = item.gpa ? ` (GPA: ${item.gpa})` : "";
+    return `${school}${yearText}${gpaText}`;
+  }
+
+  function getParticipantCertificateFileName(item: ParticipantPortfolioData["certificates"][number]) {
+    if (item.fileName) return item.fileName;
+    const url = String(item.badgeLink ?? "").split("?")[0];
+    const lastPart = decodeURIComponent(url.split("/").filter(Boolean).pop() ?? "");
+    return lastPart || item.title || "certificate file";
+  }
+
+  function isParticipantPdfUrl(url: string) {
+    return /\.pdf(\?.*)?$/i.test(String(url ?? ""));
+  }
+
+  function toggleParticipantCertificatePreview(item: ParticipantPortfolioData["certificates"][number]) {
+    if (!item.badgeLink) return;
+    setActiveParticipantCertificatePreviewId((previous) => previous === item.id ? null : item.id);
+  }
+
+  function renderParticipantCertificatePreview(item: ParticipantPortfolioData["certificates"][number]) {
+    if (!item.badgeLink) return null;
+    const fileUrl = item.badgeLink;
+    const fileName = getParticipantCertificateFileName(item);
+    const isImage = /\.(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/i.test(fileUrl);
+    const isPdf = isParticipantPdfUrl(fileUrl);
+    return (
+      <div className={styles.participantInlineFilePreview} onClick={(event) => event.stopPropagation()}>
+        <div className={styles.participantInlineFileHeader}>
+          <img src={getPortfolioSourceIcon(item.source)} alt="" className={styles.participantInlineSourceIcon} />
+          <div className={styles.participantInlineFileName}>{fileName}</div>
+          <a className={styles.participantInlineFileOpenLink} href={fileUrl} target="_blank" rel="noopener noreferrer">Open</a>
+        </div>
+        {isImage ? (
+          <img src={fileUrl} alt={fileName} className={styles.participantInlineFileImage} />
+        ) : isPdf ? (
+          <iframe title={fileName} src={fileUrl} className={styles.participantInlineFileFrame} />
+        ) : (
+          <div className={styles.participantInlineFileFallback}>This file type cannot be previewed inline. Click Open to view it.</div>
+        )}
+      </div>
+    );
   }
 
   async function openParticipantPortfolio(person: ParticipantItem) {
     setSelectedParticipant(person);
     setParticipantPortfolio(null);
     setParticipantPortfolioError("");
+    setActiveParticipantCertificatePreviewId(null);
     setParticipantPortfolioLoading(true);
 
     try {
@@ -837,6 +985,7 @@ export default function OrgDashboardPage() {
     setParticipantPortfolio(null);
     setParticipantPortfolioError("");
     setParticipantPortfolioLoading(false);
+    setActiveParticipantCertificatePreviewId(null);
   }
 
   function toStringValue(value: unknown, fallback = "") {
@@ -2401,15 +2550,15 @@ export default function OrgDashboardPage() {
         const popupPhoto =
           normalizeS3ImageUrl(info?.profileImageUrl) || selectedParticipant.profileImage;
         const popupName = getParticipantPopupName();
-        const softSkills = popupData.skills.filter((skill) => skill.kind === "soft");
-        const technicalSkills = popupData.skills.filter((skill) => skill.kind === "technical");
-        const certificates = popupData.certificates.filter((item) => item.itemType === "certificate");
-        const badges = popupData.certificates.filter((item) => item.itemType === "badge");
+        const softSkills = popupData.skills.filter((skill) => skill.kind === "soft" && skill.isSelected !== false);
+        const technicalSkills = popupData.skills.filter((skill) => skill.kind === "technical" && skill.isSelected !== false);
+        const certificates = popupData.certificates.filter((item) => item.itemType === "certificate" && item.isSelected !== false);
+        const badges = popupData.certificates.filter((item) => item.itemType === "badge" && item.isSelected !== false);
 
         return (
           <div className={styles.participantPopupOverlay} onClick={closeParticipantPortfolio}>
             <div
-              className={styles.participantPopupCard}
+              className={styles.participantPortfolioCard}
               role="dialog"
               aria-modal="true"
               aria-label="Student portfolio"
@@ -2424,174 +2573,217 @@ export default function OrgDashboardPage() {
                 ×
               </button>
 
-              <div className={styles.participantPopupHeader}>
-                <div className={styles.participantPopupPhotoCard}>
-                  {popupPhoto ? (
-                    <img
-                      src={popupPhoto}
-                      alt={popupName}
-                      className={styles.participantPopupPhoto}
-                    />
-                  ) : (
-                    <div
-                      className={styles.participantPopupInitials}
-                      style={{ background: selectedParticipant.avatarBg }}
-                    >
-                      {selectedParticipant.initials}
-                    </div>
-                  )}
-                </div>
-
-                <div className={styles.participantPopupBioCard}>
-                  <div className={styles.participantPopupName}>{popupName}</div>
-                  <div className={styles.participantPopupBioText}>
-                    {info?.aboutMe || selectedParticipant.subtitle || "No bio information yet."}
-                  </div>
-
-                  <div className={styles.participantPopupInfoGrid}>
-                    <div><span>Phone:</span> {info?.phone || "-"}</div>
-                    <div><span>Email:</span> {info?.email || "-"}</div>
-                    <div className={styles.participantPopupFullInfo}><span>Address:</span> {info?.address || "-"}</div>
-                  </div>
-                </div>
-              </div>
-
-              {participantPortfolioLoading ? (
-                <div className={styles.participantPopupState}>Loading portfolio...</div>
-              ) : participantPortfolioError ? (
-                <div className={styles.participantPopupError}>{participantPortfolioError}</div>
-              ) : (
-                <div className={styles.participantPopupScroll}>
-                  <section className={styles.participantPopupSection}>
-                    <h4>Education</h4>
-                    <div className={styles.participantPopupSectionBody}>
-                      {popupData.education.length === 0 ? (
-                        <div className={styles.participantPopupEmpty}>No education information.</div>
+              <div className={styles.participantPortfolioScroll}>
+                <section className={styles.participantPortfolioTopSection}>
+                  <div className={styles.participantPortfolioPhotoCard}>
+                    <div className={styles.participantPortfolioPhotoFrame}>
+                      {popupPhoto ? (
+                        <img
+                          src={popupPhoto}
+                          alt={popupName}
+                          className={styles.participantPortfolioPhoto}
+                        />
                       ) : (
-                        popupData.education.map((item, index) => (
-                          <div key={`${item.id || "education"}-${index}`} className={styles.participantPopupLine}>
-                            {formatEducationLine(item)}
-                          </div>
-                        ))
+                        <div
+                          className={styles.participantPortfolioInitials}
+                          style={{ background: selectedParticipant.avatarBg }}
+                        >
+                          {selectedParticipant.initials}
+                        </div>
                       )}
                     </div>
-                  </section>
+                  </div>
 
-                  <section className={styles.participantPopupSkillGrid}>
-                    <div>
-                      <h4>Soft Skills</h4>
-                      <div className={styles.participantPopupSectionBody}>
-                        {softSkills.length === 0 ? (
-                          <div className={styles.participantPopupEmpty}>No soft skills.</div>
+                  <div className={styles.participantPortfolioAboutCard}>
+                    <div className={styles.participantPortfolioName}>{popupName}</div>
+                    <div className={styles.participantPortfolioAboutText}>
+                      {info?.aboutMe || selectedParticipant.subtitle || "No bio information yet."}
+                    </div>
+
+                    <div className={styles.participantPortfolioInfoGrid}>
+                      <div><span>Phone:</span> {info?.phone || "-"}</div>
+                      <div><span>Email:</span> {info?.email || "-"}</div>
+                      <div className={styles.participantPortfolioFullRow}><span>Address:</span> {info?.address || "-"}</div>
+                    </div>
+                  </div>
+                </section>
+
+                {participantPortfolioLoading ? (
+                  <div className={styles.participantPopupState}>Loading portfolio...</div>
+                ) : participantPortfolioError ? (
+                  <div className={styles.participantPopupError}>{participantPortfolioError}</div>
+                ) : (
+                  <>
+                    <section className={styles.participantPortfolioBlock}>
+                      <div className={styles.participantPortfolioBlockHeader}>
+                        <div className={styles.participantPortfolioBlockTitle}>Education</div>
+                      </div>
+                      <div className={styles.participantPortfolioBlockBody}>
+                        {popupData.education.length === 0 ? (
+                          <div className={styles.participantPortfolioEmpty}>No education information.</div>
                         ) : (
-                          softSkills.map((skill, index) => (
-                            <div key={`${skill.id || "soft-skill"}-${index}`} className={styles.participantPopupSourceLine}>
-                              <img
-                                src={getPortfolioSourceIcon(skill.source)}
-                                alt=""
-                                className={styles.participantPopupSourceIcon}
-                              />
-                              <span>{skill.name}</span>
+                          popupData.education.map((item, index) => (
+                            <div key={`${item.id || "education"}-${index}`} className={styles.participantPortfolioSimpleLine}>
+                              {formatEducationLine(item)}
                             </div>
                           ))
                         )}
                       </div>
-                    </div>
+                    </section>
 
-                    <div>
-                      <h4>Technical Skills</h4>
-                      <div className={styles.participantPopupSectionBody}>
-                        {technicalSkills.length === 0 ? (
-                          <div className={styles.participantPopupEmpty}>No technical skills.</div>
-                        ) : (
-                          technicalSkills.map((skill, index) => (
-                            <div key={`${skill.id || "technical-skill"}-${index}`} className={styles.participantPopupSourceLine}>
-                              <img
-                                src={getPortfolioSourceIcon(skill.source)}
-                                alt=""
-                                className={styles.participantPopupSourceIcon}
-                              />
-                              <span>{skill.name}</span>
-                            </div>
-                          ))
-                        )}
+                    <section className={styles.participantPortfolioSkillsSplit}>
+                      <div className={styles.participantPortfolioSkillsHeaderRow}>
+                        <div className={styles.participantPortfolioSkillsTitle}>Soft Skills</div>
+                        <div className={styles.participantPortfolioSkillsTitle}>Technical Skills</div>
                       </div>
-                    </div>
-                  </section>
-
-                  <section className={styles.participantPopupSection}>
-                    <h4>Badge and Certificate</h4>
-                    <div className={styles.participantPopupSectionBody}>
-                      {certificates.length === 0 && badges.length === 0 ? (
-                        <div className={styles.participantPopupEmpty}>No badge or certificate.</div>
-                      ) : (
-                        <>
-                          {certificates.length > 0 && (
-                            <>
-                              <div className={styles.participantPopupSubTitle}>Certificates</div>
-                              <div className={styles.participantPopupList}>
-                                {certificates.map((item, index) => (
-                                  <div key={`${item.id || "certificate"}-${index}`} className={styles.participantPopupSourceLine}>
-                                    <img
-                                      src={getPortfolioSourceIcon(item.source)}
-                                      alt=""
-                                      className={styles.participantPopupSourceIcon}
-                                    />
-                                    <span>{item.title}{item.date ? ` • ${item.date}` : ""}</span>
-                                  </div>
-                                ))}
+                      <div className={styles.participantPortfolioSkillsBody}>
+                        <div className={styles.participantPortfolioSkillsColumn}>
+                          {softSkills.length === 0 ? (
+                            <div className={styles.participantPortfolioEmpty}>No soft skills.</div>
+                          ) : (
+                            softSkills.map((skill, index) => (
+                              <div key={`${skill.id || "soft-skill"}-${index}`} className={styles.participantPortfolioSkillLine}>
+                                - {skill.name}
                               </div>
-                            </>
+                            ))
                           )}
-
-                          {badges.length > 0 && (
-                            <>
-                              <div className={styles.participantPopupSubTitle}>Badges</div>
-                              <div className={styles.participantPopupList}>
-                                {badges.map((item, index) => (
-                                  <div key={`${item.id || "badge"}-${index}`} className={styles.participantPopupSourceLine}>
-                                    <img
-                                      src={getPortfolioSourceIcon(item.source)}
-                                      alt=""
-                                      className={styles.participantPopupSourceIcon}
-                                    />
-                                    <span>{item.title}{item.date ? ` • ${item.date}` : ""}</span>
-                                  </div>
-                                ))}
+                        </div>
+                        <div className={styles.participantPortfolioSkillsDivider} />
+                        <div className={styles.participantPortfolioSkillsColumn}>
+                          {technicalSkills.length === 0 ? (
+                            <div className={styles.participantPortfolioEmpty}>No technical skills.</div>
+                          ) : (
+                            technicalSkills.map((skill, index) => (
+                              <div key={`${skill.id || "technical-skill"}-${index}`} className={styles.participantPortfolioSkillLine}>
+                                - {skill.name}
                               </div>
-                            </>
+                            ))
                           )}
-                        </>
-                      )}
-                    </div>
-                  </section>
+                        </div>
+                      </div>
+                    </section>
 
-                  <section className={styles.participantPopupSection}>
-                    <h4>Experience and Activity</h4>
-                    <div className={styles.participantPopupSectionBody}>
-                      {popupData.experiences.length === 0 ? (
-                        <div className={styles.participantPopupEmpty}>No experience or activity.</div>
-                      ) : (
-                        popupData.experiences.map((item, index) => (
-                          <div key={`${item.id || "experience"}-${index}`} className={styles.participantPopupExperienceItem}>
-                            <div className={styles.participantPopupExperienceTitle}>
-                              <img
-                                src={getPortfolioSourceIcon(item.source)}
-                                alt=""
-                                className={styles.participantPopupSourceIcon}
-                              />
-                              <span>{item.period ? `[${item.period}] - ` : ""}{item.title}</span>
-                            </div>
-                            {item.description && (
-                              <div className={styles.participantPopupExperienceDesc}>{item.description}</div>
+                    <section className={styles.participantPortfolioBlock}>
+                      <div className={styles.participantPortfolioBlockHeader}>
+                        <div className={styles.participantPortfolioBlockTitle}>Badge and Certificate</div>
+                      </div>
+                      <div className={styles.participantPortfolioBlockBody}>
+                        {certificates.length === 0 && badges.length === 0 ? (
+                          <div className={styles.participantPortfolioEmpty}>No badge or certificate.</div>
+                        ) : (
+                          <>
+                            {certificates.length > 0 && (
+                              <>
+                                <div className={styles.participantPortfolioBlockSubTitle}>Certificates</div>
+                                <div className={styles.participantPortfolioList}>
+                                  {certificates.map((item, index) => (
+                                    <div key={`${item.id || "certificate"}-${index}`} className={styles.participantFileListItemWrap}>
+                                      <div
+                                        className={styles.participantFileListItem}
+                                        role={item.badgeLink ? "button" : undefined}
+                                        tabIndex={item.badgeLink ? 0 : undefined}
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          toggleParticipantCertificatePreview(item);
+                                        }}
+                                        onKeyDown={(event) => {
+                                          if (event.key === "Enter" || event.key === " ") {
+                                            event.preventDefault();
+                                            event.stopPropagation();
+                                            toggleParticipantCertificatePreview(item);
+                                          }
+                                        }}
+                                        title={item.badgeLink ? "Click to preview file" : undefined}
+                                      >
+                                        <img src={getPortfolioSourceIcon(item.source)} alt="" className={styles.participantPortfolioSourceIcon} />
+                                        <span>- {item.title}{item.date ? ` (${item.date})` : ""}</span>
+                                        {item.badgeLink && (
+                                          <div className={styles.participantFileHoverPopup}>
+                                            <div className={styles.participantFilePopupTitle}>{normalizePortfolioSource(item.source) === "upload" ? "Upload" : "Platform"}</div>
+                                            <div className={styles.participantFilePopupName}>{getParticipantCertificateFileName(item)}</div>
+                                            <div className={styles.participantFilePopupHint}>Click this item to preview</div>
+                                          </div>
+                                        )}
+                                      </div>
+                                      {activeParticipantCertificatePreviewId === item.id && renderParticipantCertificatePreview(item)}
+                                    </div>
+                                  ))}
+                                </div>
+                              </>
                             )}
+
+                            {badges.length > 0 && (
+                              <>
+                                <div className={styles.participantPortfolioBlockSubTitle}>Badges</div>
+                                <div className={styles.participantPortfolioList}>
+                                  {badges.map((item, index) => (
+                                    <div key={`${item.id || "badge"}-${index}`} className={styles.participantFileListItemWrap}>
+                                      <div
+                                        className={styles.participantFileListItem}
+                                        role={item.badgeLink ? "button" : undefined}
+                                        tabIndex={item.badgeLink ? 0 : undefined}
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          toggleParticipantCertificatePreview(item);
+                                        }}
+                                        onKeyDown={(event) => {
+                                          if (event.key === "Enter" || event.key === " ") {
+                                            event.preventDefault();
+                                            event.stopPropagation();
+                                            toggleParticipantCertificatePreview(item);
+                                          }
+                                        }}
+                                        title={item.badgeLink ? "Click to preview file" : undefined}
+                                      >
+                                        <img src={getPortfolioSourceIcon(item.source)} alt="" className={styles.participantPortfolioSourceIcon} />
+                                        <span>- {item.title}{item.date ? ` (${item.date})` : ""}</span>
+                                        {item.badgeLink && (
+                                          <div className={styles.participantFileHoverPopup}>
+                                            <div className={styles.participantFilePopupTitle}>{normalizePortfolioSource(item.source) === "upload" ? "Upload" : "Platform"}</div>
+                                            <div className={styles.participantFilePopupName}>{getParticipantCertificateFileName(item)}</div>
+                                            <div className={styles.participantFilePopupHint}>Click this item to preview</div>
+                                          </div>
+                                        )}
+                                      </div>
+                                      {activeParticipantCertificatePreviewId === item.id && renderParticipantCertificatePreview(item)}
+                                    </div>
+                                  ))}
+                                </div>
+                              </>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </section>
+
+                    <section className={styles.participantPortfolioBlock}>
+                      <div className={styles.participantPortfolioBlockHeader}>
+                        <div className={styles.participantPortfolioBlockTitle}>Experience and Activity</div>
+                      </div>
+                      <div className={styles.participantPortfolioBlockBody}>
+                        {popupData.experiences.length === 0 ? (
+                          <div className={styles.participantPortfolioEmpty}>No experience or activity.</div>
+                        ) : (
+                          <div className={styles.participantPortfolioExpList}>
+                            {popupData.experiences.map((item, index) => (
+                              <div key={`${item.id || "experience"}-${index}`} className={styles.participantPortfolioExpItem}>
+                                <div className={styles.participantPortfolioExpTop}>
+                                  <img src={getPortfolioSourceIcon(item.source)} alt="" className={styles.participantPortfolioSourceIcon} />
+                                  <span>{item.period ? `[${item.period}]` : ""}</span>
+                                  <span>- {item.title}</span>
+                                </div>
+                                {item.description && (
+                                  <div className={styles.participantPortfolioExpDesc}>{item.description}</div>
+                                )}
+                              </div>
+                            ))}
                           </div>
-                        ))
-                      )}
-                    </div>
-                  </section>
-                </div>
-              )}
+                        )}
+                      </div>
+                    </section>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         );

@@ -51,6 +51,8 @@ function ChallengeProgressContent() {
         });
         const json = await res.json();
         if (json.ok) {
+          console.log("[ChallengeProgress] challenge_info keys:", Object.keys(json.data?.challenge_info ?? {}));
+          console.log("[ChallengeProgress] challenge_info:", JSON.stringify(json.data?.challenge_info, null, 2));
           setChallenge(json.data);
         }
       } catch (error) {
@@ -178,11 +180,11 @@ function ChallengeProgressContent() {
     { label: "Type", value: "Challenge" },
     { label: "Hours", value: challenge?.activity?.Hours ?? "—" },
     { label: "Due Date", value: dueDate },
-    { label: "Difficulty", value: challenge?.challenge_info?.difficulty ?? "—" },
+    { label: "Difficulty", value: challenge?.challenge_info?.difficulty ?? challenge?.challenge_info?.Difficulty ?? challenge?.activity?.Difficulty ?? "—" },
     {
       label: "XP Reward",
-      value: challenge?.challenge_info?.xp
-        ? `+${challenge.challenge_info.xp} XP`
+      value: (challenge?.challenge_info?.xp ?? challenge?.challenge_info?.XP ?? challenge?.challenge_info?.xp_reward)
+        ? `+${challenge?.challenge_info?.xp ?? challenge?.challenge_info?.XP ?? challenge?.challenge_info?.xp_reward} XP`
         : "—",
     },
     { label: "Status", value: currentStatus },
@@ -215,7 +217,10 @@ function ChallengeProgressContent() {
           </div>
 
           <p className={styles.description}>
-            {challenge?.challenge_info?.problem_statement ?? "Loading..."}
+            {challenge?.challenge_info?.problem_statement
+              ?? challenge?.challenge_info?.ProblemStatement
+              ?? challenge?.activity?.ProblemStatement
+              ?? "Loading..."}
           </p>
 
           <div className={styles.metaGrid}>
@@ -253,7 +258,10 @@ function ChallengeProgressContent() {
           <div className={styles.sectionBlock}>
             <div className={styles.sectionTitle}>Problem statement</div>
             <p className={styles.sectionText}>
-              {challenge?.challenge_info?.problem_statement ?? "—"}
+              {challenge?.challenge_info?.problem_statement
+                ?? challenge?.challenge_info?.ProblemStatement
+                ?? challenge?.activity?.ProblemStatement
+                ?? "—"}
             </p>
           </div>
 
@@ -262,7 +270,13 @@ function ChallengeProgressContent() {
           <div className={styles.sectionBlock}>
             <div className={styles.sectionTitle}>Expected outcome</div>
             <p className={styles.sectionText}>
-              {challenge?.challenge_info?.expected_outcome ?? "—"}
+              {challenge?.challenge_info?.description
+                ?? challenge?.challenge_info?.ExpectedOutcome
+                ?? challenge?.challenge_info?.expected_output
+                ?? challenge?.challenge_info?.ExpectedOutput
+                ?? challenge?.activity?.ExpectedOutcome
+                ?? challenge?.activity?.description
+                ?? "—"}
             </p>
           </div>
         </section>

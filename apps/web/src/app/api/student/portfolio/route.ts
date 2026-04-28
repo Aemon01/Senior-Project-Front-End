@@ -9,6 +9,35 @@ type SessionTokens = {
   idToken: string;
 };
 
+
+const PUBLIC_ASSET_BASE =
+  process.env.NEXT_PUBLIC_S3_PUBLIC_BASE_URL ||
+  "https://vcep-assets-dev.s3.ap-southeast-2.amazonaws.com";
+
+function toPublicAssetUrl(value: unknown) {
+  const raw = pickString(value);
+  if (!raw) return "";
+  if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+  return `${PUBLIC_ASSET_BASE.replace(/\/+$/, "")}/${raw.replace(/^\/+/, "")}`;
+}
+function getFileNameFromUrl(url: unknown) {
+  const cleanUrl = pickString(url);
+  if (!cleanUrl) return "";
+  try {
+    const parsed = new URL(cleanUrl);
+    const lastPart = parsed.pathname.split("/").filter(Boolean).pop() ?? "";
+    return decodeURIComponent(lastPart);
+  } catch {
+    const lastPart = cleanUrl.split("?")[0].split("/").filter(Boolean).pop() ?? "";
+    try {
+      return decodeURIComponent(lastPart);
+    } catch {
+      return lastPart;
+    }
+  }
+}
+
+
 type PortfolioType =
   | "info"
   | "education"
@@ -114,6 +143,48 @@ function normalizeDate(value: unknown) {
   return s;
 }
 
+function unwrapPortfolioRoot(value: any, stdId?: string) {
+  const root = value?.data ?? value ?? {};
+
+  if (
+    root?.info ||
+    root?.Info ||
+    root?.education ||
+    root?.Education ||
+    root?.skills ||
+    root?.Skills ||
+    root?.certificates ||
+    root?.Certificates ||
+    root?.experience ||
+    root?.Experience
+  ) {
+    return root;
+  }
+
+  if (stdId && root?.[stdId]) return root[stdId];
+
+  if (
+    root?.std_id &&
+    typeof root.std_id === "object" &&
+    !Array.isArray(root.std_id)
+  ) {
+    return root.std_id;
+  }
+
+  if (
+    root?.portfolio &&
+    typeof root.portfolio === "object" &&
+    !Array.isArray(root.portfolio)
+  ) {
+    return root.portfolio;
+  }
+
+  const firstObjectValue = Object.values(root).find(
+    (item) => item && typeof item === "object" && !Array.isArray(item)
+  );
+
+  return (firstObjectValue as any) ?? root;
+}
 
 async function fetchJson(url: string, accessToken: string) {
   const res = await fetch(url, {
@@ -222,31 +293,107 @@ async function getStdId(accessToken: string, idToken: string) {
   return students.find((s) => s?.user_id === user.user_id)?.std_id ?? null;
 }
 
-function normalizeStudentInfo(portfolioRoot: any, _dashboardRoot: any) {
-  const info = safeObject(portfolioRoot?.info ?? portfolioRoot?.Info ?? {});
+function normalizeStudentInfo(portfolioRoot: any, dashboardRoot: any) {
+  const info = safeObject(
+    portfolioRoot?.info ??
+      portfolioRoot?.Info ??
+      portfolioRoot?.student_info ??
+      portfolioRoot?.studentInfo ??
+      {}
+  );
+
+  const dashboardInfo = safeObject(
+    dashboardRoot?.student_info ??
+      dashboardRoot?.studentInfo ??
+      dashboardRoot?.student ??
+      dashboardRoot ??
+      {}
+  );
+
   return {
-    first_name: pickString(info.first_name, info.firstName),
-    last_name: pickString(info.last_name, info.lastName),
-    birth_date: normalizeDate(info.birth_date ?? info.birthDate),
-    phone: pickString(info.phone),
-    email: pickString(info.email),
-    address: pickString(info.address),
-    about_me: pickString(info.about_me, info.aboutMe),
-    profile_image_url: pickString(info.profile_image_url),
+    first_name: pickString(
+      info.first_name,
+      info.firstName,
+      info.FirstName,
+      dashboardInfo.first_name,
+      dashboardInfo.firstName,
+      dashboardInfo.FirstName
+    ),
+    last_name: pickString(
+      info.last_name,
+      info.lastName,
+      info.LastName,
+      dashboardInfo.last_name,
+      dashboardInfo.lastName,
+      dashboardInfo.LastName
+    ),
+    birth_date: normalizeDate(
+      info.birth_date ??
+        info.birthDate ??
+        info.BirthDate ??
+        dashboardInfo.birth_date ??
+        dashboardInfo.birthDate
+    ),
+    phone: pickString(info.phone, info.Phone, dashboardInfo.phone),
+    email: pickString(info.email, info.Email, dashboardInfo.email),
+    address: pickString(info.address, info.Address, dashboardInfo.address),
+    about_me: pickString(
+      info.about_me,
+      info.aboutMe,
+      info.AboutMe,
+      dashboardInfo.about_me,
+      dashboardInfo.aboutMe
+    ),
+    profile_image_url: toPublicAssetUrl(
+      pickString(
+        info.profile_image_url,
+        info.profileImageUrl,
+        info.ProfileImageUrl,
+        info.avatar_image_url,
+        info.avatarImageUrl,
+        dashboardInfo.profile_image_url,
+        dashboardInfo.profileImageUrl,
+        dashboardInfo.avatar_image_url,
+        dashboardInfo.avatarImageUrl
+      )
+    ),
   };
 }
 
 function normalizeEducation(portfolioRoot: any) {
   const list = safeArray<any>(portfolioRoot?.education ?? portfolioRoot?.Education ?? []);
+
   return list.map((item, index) => ({
-    id: `education-${index}`,
-    school: pickString(item?.institution, item?.school, item?.university, item?.facultyschool),
-    degree: pickString(item?.degreeLevel, item?.degree_level, item?.degree),
-    faculty: pickString(item?.faculty),
-    fieldOfStudy: pickString(item?.major, item?.field_of_study, item?.fieldOfStudy),
-    start_year: String(item?.startYear ?? item?.start_year ?? ""),
-    end_year: String(item?.endYear ?? item?.end_year ?? ""),
-    gpa: pickString(item?.gpa),
+    id:
+      pickString(item?.id, item?.educationID, item?.EducationID) ||
+      `education-${index}`,
+    school: pickString(
+      item?.institution,
+      item?.Institution,
+      item?.school,
+      item?.School,
+      item?.university,
+      item?.University,
+      item?.facultyschool
+    ),
+    degree: pickString(
+      item?.degreeLevel,
+      item?.DegreeLevel,
+      item?.degree_level,
+      item?.degree,
+      item?.Degree
+    ),
+    faculty: pickString(item?.faculty, item?.Faculty),
+    fieldOfStudy: pickString(
+      item?.major,
+      item?.Major,
+      item?.field_of_study,
+      item?.fieldOfStudy,
+      item?.FieldOfStudy
+    ),
+    startYear: String(item?.startYear ?? item?.StartYear ?? item?.start_year ?? ""),
+    endYear: String(item?.endYear ?? item?.EndYear ?? item?.end_year ?? ""),
+    gpa: pickString(item?.gpa, item?.GPA),
   }));
 }
 
@@ -261,18 +408,36 @@ function normalizeSkills(portfolioRoot: any) {
   }));
 }
 
-function normalizeCertificates(portfolioRoot: any) {
+function normalizeCertificates(portfolioRoot: any, stdId?: string) {
   const list = safeArray<any>(portfolioRoot?.certificates ?? portfolioRoot?.Certificates ?? []);
-  console.log("certificate list", list)
   return list.map((item, index) => {
-    const typeStr = String(item?.Type ?? "certificate").toLowerCase();
+    const typeStr = String(item?.type ?? item?.Type ?? item?.itemType ?? "certificate").toLowerCase();
+    const fileName = pickString(item?.fileName, item?.file_name);
+    const rawLink = pickString(
+      item?.badgeLink,
+      item?.badge_link,
+      item?.badgeUrl,
+      item?.badge_url,
+      item?.certificateLink,
+      item?.certificate_link,
+      item?.fileUrl,
+      item?.file_url,
+      item?.externalWebsite,
+      item?.external_website,
+      item?.url,
+      item?.link,
+      fileName && stdId ? `student-certificates//` : ""
+    );
 
     return {
       id: `certificate-${index}`,
       itemType: typeStr === "badge" ? "badge" : "certificate",
-      title: pickString(item?.name, item?.Name, item?.title),
-      date: normalizeDate(item?.date ?? item?.issue_date),
-      badgeLink: pickString(item?.badgeLink, item?.badge_link),
+      title: pickString(item?.name, item?.Name, item?.title, item?.Title),
+      date: normalizeDate(item?.date ?? item?.issue_date ?? item?.IssueDate),
+      badgeLink: toPublicAssetUrl(rawLink),
+      fileName: fileName || getFileNameFromUrl(rawLink),
+      source: (item?.fromSystem === true || item?.FromSystem === true) ? "platform" : "upload",
+      isSelected: typeof item?.enable === "boolean" ? item.enable : (typeof item?.Enable === "boolean" ? item.Enable : true),
     };
   });
 }
@@ -289,6 +454,7 @@ function normalizeExperiences(portfolioRoot: any) {
       title: pickString(item?.topic, item?.Topic),
       description: pickString(item?.description, item?.Description),
       source: (item?.fromSystem === true || item?.FromSystem === true) ? "platform" : "upload",
+      enable: typeof item?.enable === "boolean" ? item.enable : (typeof item?.Enable === "boolean" ? item.Enable : true),
       files: [],
     };
   });
@@ -304,7 +470,7 @@ function buildBackendPayload(type: PortfolioType, body: any) {
       address: pickString(body?.address),
       about_me: pickString(body?.about_me, body?.aboutMe),
       birth_date: pickString(body?.birth_date, body?.birthDate),
-      profile_image_url: pickString(body?.profile_image_url),
+      profile_image_url: toPublicAssetUrl(pickString(body?.profile_image_url, body?.profileImageUrl, body?.avatar_image_url, body?.avatarImageUrl)),
     };
   }
 
@@ -335,12 +501,36 @@ function buildBackendPayload(type: PortfolioType, body: any) {
 
   if (type === "certificate") {
     // Certificate schema has no ID field — omit it entirely
-    return safeArray<any>(body?.certificates ?? body).map((item) => ({
-      name: pickString(item?.name, item?.title),
-      type: String(item?.itemType ?? item?.type ?? "certificate"),
-      badgeLink: pickString(item?.badgeLink, item?.badge_link),
-      enable: typeof item?.enable === "boolean" ? item.enable : true,
-    }));
+    return safeArray<any>(body?.certificates ?? body).map((item) => {
+      const fileUrl = toPublicAssetUrl(pickString(item?.badgeLink, item?.badge_link, item?.badgeUrl, item?.badge_url, item?.certificateLink, item?.certificate_link, item?.fileUrl, item?.file_url, item?.externalWebsite, item?.external_website, item?.url, item?.link));
+      const fileName = pickString(item?.fileName, item?.file_name);
+      const itemType = String(item?.itemType ?? item?.type ?? "certificate");
+      const fromSystem = item?.source === "platform" || item?.fromSystem === true;
+      const enable = typeof item?.isSelected === "boolean" ? item.isSelected : (typeof item?.enable === "boolean" ? item.enable : true);
+
+      return {
+        name: pickString(item?.name, item?.title),
+        title: pickString(item?.name, item?.title),
+        type: itemType,
+        itemType,
+        badgeLink: fileUrl,
+        badge_link: fileUrl,
+        fileUrl,
+        file_url: fileUrl,
+        badgeUrl: fileUrl,
+        badge_url: fileUrl,
+        certificateLink: fileUrl,
+        certificate_link: fileUrl,
+        externalWebsite: fileUrl,
+        external_website: fileUrl,
+        fileName,
+        file_name: fileName,
+        fromSystem,
+        source: fromSystem ? "platform" : "upload",
+        enable,
+        isSelected: enable,
+      };
+    });
   }
 
   if (type === "experience") {
@@ -437,7 +627,7 @@ export async function GET(req: Request) {
       tryFetchJson(`${BACKEND}/student/${stdId}/dashboard`, sess.accessToken),
     ]);
 
-    const portfolioRoot = portfolioJson?.data ?? portfolioJson ?? {};
+    const portfolioRoot = unwrapPortfolioRoot(portfolioJson, stdId);
     const dashboardRoot = dashboardJson?.data ?? dashboardJson ?? {};
 
     // console.log("portfolioRoot: ", portfolioRoot);
@@ -446,7 +636,7 @@ export async function GET(req: Request) {
       student_info: normalizeStudentInfo(portfolioRoot, dashboardRoot),
       education: normalizeEducation(portfolioRoot),
       skills: normalizeSkills(portfolioRoot),
-      certificates: normalizeCertificates(portfolioRoot),
+      certificates: normalizeCertificates(portfolioRoot, stdId),
       experiences: normalizeExperiences(portfolioRoot),
     }
 
