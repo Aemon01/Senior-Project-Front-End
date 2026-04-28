@@ -166,6 +166,10 @@ function YawAnimator({
   return null;
 }
 
+function getCompanyLabelKey(company: Company | null | undefined, fallback = "") {
+  return String(company?.id || company?.name || fallback).trim().toLowerCase();
+}
+
 function MapModel({
   roadNamePrefix = "paved",
   buildingNameIncludes = ["building"],
@@ -174,6 +178,7 @@ function MapModel({
   onPickBuilding,
   onHoverBuilding,
   resolveCompany,
+  hoverBuilding,
 }: {
   roadNamePrefix?: string;
   buildingNameIncludes?: string[];
@@ -182,6 +187,7 @@ function MapModel({
   onPickBuilding?: (payload: PickBuildingPayload) => void;
   onHoverBuilding?: (payload: HoverBuildingPayload) => void;
   resolveCompany: (meshName: string) => Company | null;
+  hoverBuilding: HoverBuildingPayload;
 }) {
   const { scene } = useGLTF("https://vcep-assets-dev.s3.ap-southeast-2.amazonaws.com/map/map.glb");
   const { camera, gl } = useThree();
@@ -297,7 +303,82 @@ function MapModel({
     ]
   );
 
-  return <primitive object={scene} onPointerMove={onPointerMove} onPointerUp={onPointerUp} />;
+  const hoveredLabelKey = getCompanyLabelKey(hoverBuilding?.company);
+
+  const persistentLabels: Array<{
+    key: string;
+    company: Company;
+    position: THREE.Vector3;
+  }> = [];
+  const usedLabelKeys = new Set<string>();
+
+  for (const mesh of buildingMeshes) {
+    const company = resolveCompany(mesh.name);
+    if (!company?.name) continue;
+
+    const companyKey = getCompanyLabelKey(company, mesh.name);
+
+    if (!companyKey || usedLabelKeys.has(companyKey)) continue;
+    usedLabelKeys.add(companyKey);
+
+    const box = new THREE.Box3().setFromObject(mesh);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+
+    const height = Number.isFinite(box.max.y - box.min.y) ? box.max.y - box.min.y : 0;
+    const yOffset = Math.max(3.2, Math.min(height * 0.28, 8));
+    const position = new THREE.Vector3(center.x, box.max.y + yOffset, center.z);
+
+    persistentLabels.push({
+      key: companyKey,
+      company,
+      position,
+    });
+  }
+
+  return (
+    <>
+      <primitive object={scene} onPointerMove={onPointerMove} onPointerUp={onPointerUp} />
+
+      {persistentLabels.map((label) => {
+        const isHovered = hoveredLabelKey === label.key;
+
+        return (
+          <Html
+            key={label.key}
+            position={label.position}
+            center
+            style={{ pointerEvents: "none" }}
+          >
+            <div
+              style={{
+                padding: "10px 16px",
+                background: isHovered
+                  ? "rgba(255, 255, 255, 0.98)"
+                  : "rgba(255, 255, 255, 0.94)",
+                color: "#111111",
+                borderRadius: 5,
+                fontSize: 13,
+                fontWeight: 900,
+                lineHeight: 1,
+                whiteSpace: "nowrap",
+                border: isHovered
+                  ? "2px solid rgba(0,0,0,0.18)"
+                  : "1px solid rgba(0,0,0,0.12)",
+                boxShadow: isHovered
+                  ? "0 14px 28px rgba(0,0,0,0.20)"
+                  : "0 10px 22px rgba(0,0,0,0.15)",
+                transform: isHovered ? "translateY(-2px)" : "translateY(0)",
+                transition: "all 140ms ease",
+              }}
+            >
+              {label.company.name}
+            </div>
+          </Html>
+        );
+      })}
+    </>
+  );
 }
 
 function NameTag({
@@ -564,26 +645,9 @@ export default function MapCanvas({
           onPickBuilding={onPickBuilding}
           onHoverBuilding={onHoverBuilding}
           resolveCompany={resolveCompany}
+          hoverBuilding={hoverBuilding}
         />
 
-        {hoverBuilding?.company?.name ? (
-          <Html position={hoverBuilding.worldPos.clone().add(new THREE.Vector3(0, 6, 0))} center>
-            <div
-              style={{
-                padding: "8px 12px",
-                background: "rgba(243, 233, 233, 0.92)",
-                color: "black",
-                borderRadius: 5,
-                fontSize: 12,
-                fontWeight: 900,
-                whiteSpace: "nowrap",
-                boxShadow: "0 10px 22px rgba(0,0,0,0.18)",
-              }}
-            >
-              {hoverBuilding.company.name}
-            </div>
-          </Html>
-        ) : null}
 
         {remotePlayers.map((player) => (
           <Avatar

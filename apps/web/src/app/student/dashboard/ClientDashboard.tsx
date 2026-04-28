@@ -13,7 +13,13 @@ import StudentCalendar, {
 /* =======================
    Types
 ======================= */
-type Skill = { id: string; name: string; percent: number };
+type Skill = {
+  id: string;
+  name: string;
+  level: number;
+  bloomPhase: string;
+  fillPercent: number;
+};
 
 type ActivityStatusKey =
   | "completed"
@@ -167,6 +173,13 @@ type ActivityStatsResponse = {
       Hours?: number | string;
       hours?: number | string;
     }>;
+    skill_levels?: Array<{
+      skill_id?: string;
+      skill_name?: string;
+      skill_level?: number | string;
+      bloom_level?: number | string;
+      level?: number | string;
+    }>;
   };
   message?: string;
 };
@@ -190,6 +203,15 @@ const BADGE_TILES: Array<{ id: TileId; label: string; image: string; alt: string
   { id: "certificate", label: "certificate", image: "/images/icons/porttfolio-icon.png", alt: "Certificate" },
   { id: "portfolio", label: "portfolio", image: "/images/icons/porttfolio-icon.png", alt: "Portfolio" },
 ];
+
+const BLOOM_PHASE_LABELS: Record<number, string> = {
+  1: "Remember",
+  2: "Understand",
+  3: "Apply",
+  4: "Analyze",
+  5: "Evaluate",
+  6: "Create",
+};
 
 /* =======================
    Helpers
@@ -323,8 +345,24 @@ function dedupeActivitiesFromStats(statsData?: ActivityStatsResponse["data"]) {
   return Array.from(uniqueMap.values());
 }
 
+const MOCK_PLACEHOLDER_VALUES = new Set([
+  "string", "activity", "unknown", "null", "undefined", "n/a", "none", "-", "",
+]);
+
+function isMockActivity(item: any): boolean {
+  const name = String(
+    item?.ActivityName || item?.Activity_name || item?.activity_name || ""
+  ).trim().toLowerCase();
+  const id = String(
+    item?.ActivityID || item?.Activity_id || item?.activity_id || ""
+  ).trim().toLowerCase();
+  return MOCK_PLACEHOLDER_VALUES.has(name) && MOCK_PLACEHOLDER_VALUES.has(id);
+}
+
 function mapOverviewActivities(statsData?: ActivityStatsResponse["data"]): ActivityItem[] {
-  return dedupeActivitiesFromStats(statsData).map((item, index) => {
+  return dedupeActivitiesFromStats(statsData)
+    .filter((item) => !isMockActivity(item))
+    .map((item, index) => {
     const type = getActivityTypeForStats(item);
 
     return {
@@ -340,6 +378,49 @@ function mapOverviewActivities(statsData?: ActivityStatsResponse["data"]): Activ
       hours: Number(item?.Hours ?? item?.hours ?? 0),
       status: normalizeOverviewStatus(getActivityStatusForStats(item)),
       detailPath: getActivityDetailPath(type),
+    };
+  });
+}
+
+function buildSkillProgressFromStats(
+  statsData?: ActivityStatsResponse["data"],
+  fallbackSkillNames: string[] = []
+): Skill[] {
+  const rawSkillLevels: any[] = Array.isArray(statsData?.skill_levels)
+    ? statsData!.skill_levels!
+    : [];
+
+  if (rawSkillLevels.length > 0) {
+    return rawSkillLevels.map((skill: any, index: number) => {
+      const rawLevel = Number(
+        skill?.skill_level ?? skill?.bloom_level ?? skill?.level ?? 1
+      );
+
+      const safeLevel = Number.isFinite(rawLevel) ? rawLevel : 1;
+      const level = Math.min(6, Math.max(1, Math.round(safeLevel)));
+
+      return {
+        id: String(skill?.skill_id || `skill-${index}`),
+        name: String(skill?.skill_name || "Unknown"),
+        level,
+        bloomPhase: BLOOM_PHASE_LABELS[level] || "Unknown",
+        fillPercent: (level / 6) * 100,
+      };
+    });
+  }
+
+  return fallbackSkillNames.map((name, index) => {
+    const level = Math.min(
+      6,
+      Math.max(1, Math.round((toSkillPercent(name, index) / 100) * 6))
+    );
+
+    return {
+      id: `skill-${index}`,
+      name,
+      level,
+      bloomPhase: BLOOM_PHASE_LABELS[level] || "Unknown",
+      fillPercent: (level / 6) * 100,
     };
   });
 }
@@ -543,39 +624,28 @@ function mapStudentToDashboard(api: DashboardApiResponse["data"], statsData?: an
     avatarChoiceId: student.avatar_choice ?? null,
   };
 
-  let skills: Skill[] = [];
-  if (statsData?.skill_levels && statsData.skill_levels.length > 0) {
-    skills = statsData.skill_levels.map((s: any, i: number) => {
-      const skillLevel = parseInt(s.skill_level || "0", 10);
-      const pct = Math.min(100, Math.max(10, skillLevel * 15));
-      return {
-        id: s.skill_id || `s${i}`,
-        name: s.skill_name || "Unknown",
-        percent: pct,
-      };
-    });
-  } else {
-    skills = skillsFromApi.map((name, index) => ({
-      id: `skill-${index}`,
-      name,
-      percent: toSkillPercent(name, index),
-    }));
-  }
+  const skills: Skill[] = buildSkillProgressFromStats(undefined, skillsFromApi);
+
+  const MOCK_NAMES = new Set(["string", "activity", "unknown", "null", "undefined", "n/a", "none", "-", ""]);
 
   const doneActivities: ActivityItem[] = Array.isArray(api?.done_activities)
-    ? api!.done_activities!.map((item, index) => {
-      const activityType = item.activity_type || "Activity";
-
-      return {
-        id: item.activity_id || `done-${index}`,
-        title: item.activity_name || "Activity",
-        sub: activityType,
-        xp: Number(item.xp ?? 0),
-        hours: Number((item as any).hours ?? 0),
-        status: item.status || "",
-        detailPath: getActivityDetailPath(activityType),
-      };
-    })
+    ? api!.done_activities!
+        .filter((item) => {
+          const name = String(item?.activity_name ?? "").trim().toLowerCase();
+          return !MOCK_NAMES.has(name);
+        })
+        .map((item, index) => {
+          const activityType = item.activity_type || "Activity";
+          return {
+            id: item.activity_id || `done-${index}`,
+            title: item.activity_name || "Activity",
+            sub: activityType,
+            xp: Number(item.xp ?? 0),
+            hours: Number((item as any).hours ?? 0),
+            status: item.status || "",
+            detailPath: getActivityDetailPath(activityType),
+          };
+        })
     : [];
 
   const schedules: ScheduleItem[] = Array.isArray(api?.schedules)
@@ -735,8 +805,9 @@ export default function ClientDashboard() {
       : 1;
 
   const [modal, setModal] = useState<ModalKind>(null);
-  const [portfolioCerts, setPortfolioCerts] = useState<Array<{ id: string; title: string; badgeLink: string }>>([]);
-  const [portfolioBadges, setPortfolioBadges] = useState<Array<{ id: string; title: string; badgeLink: string }>>([]);
+
+  const [editJobOptions, setEditJobOptions] = useState<Array<{id:string;name:string}>>([]);
+  const [editSkillOptions, setEditSkillOptions] = useState<Array<{id:string;name:string}>>([]);
 
   const [draft, setDraft] = useState({
     firstName: "",
@@ -746,6 +817,12 @@ export default function ClientDashboard() {
     email: "",
     address: "",
     about: "",
+    university: "",
+    faculty: "",
+    major: "",
+    year: "",
+    jobSelected: [] as string[],
+    skillSelected: [] as string[],
   });
 
   const closeCropModal = () => {
@@ -817,7 +894,28 @@ export default function ClientDashboard() {
           throw new Error(json?.message || "Failed to load dashboard");
         }
 
-        const mapped = mapStudentToDashboard(json.data, statsJson?.data);
+        const mapped = mapStudentToDashboard(json.data);
+
+        let mappedSkills: Skill[] = mapped.skills;
+        let mappedOverviewActivities: ActivityItem[] = mapped.doneActivities;
+        let mappedCompletionSegments: CompletionSegment[] = mapped.completionSegments;
+
+        if (activityStatsRes && activityStatsRes.ok) {
+          const activityStatsJson: ActivityStatsResponse | null =
+            await activityStatsRes.json().catch(() => null);
+
+          if (activityStatsJson?.ok) {
+            mappedSkills = buildSkillProgressFromStats(
+              activityStatsJson.data,
+              mapped.me.skill
+            );
+            mappedOverviewActivities = mapOverviewActivities(activityStatsJson.data);
+            mappedCompletionSegments = buildCompletionSegmentsFromStats(
+              activityStatsJson.data,
+              mapped.schedules
+            );
+          }
+        }
 
         let avatarOptions: AvatarOption[] = [];
         if (avatarRes && avatarRes.ok) {
@@ -873,7 +971,7 @@ export default function ClientDashboard() {
               }
               : mapped.me
           );
-          setSkills(mapped.skills);
+          setSkills(mappedSkills);
           setDoneActivities(mapped.doneActivities);
           setOverviewActivities(mappedOverviewActivities);
           setSchedules(mapped.schedules);
@@ -926,8 +1024,36 @@ export default function ClientDashboard() {
       email: me.email,
       address: me.address,
       about: me.bio,
+      university: me.university,
+      faculty: me.faculty,
+      major: me.major,
+      year: me.year,
+      jobSelected: Array.isArray(me.interests) ? me.interests : [],
+      skillSelected: Array.isArray(me.skill) ? me.skill : [],
     }));
   }, [me]);
+
+  useEffect(() => {
+    if (modal !== "editProfile") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [jobsRes, skillsRes] = await Promise.all([
+          fetch("/api/options/careers", { cache: "no-store" }),
+          fetch("/api/options/skills", { cache: "no-store" }),
+        ]);
+        if (!cancelled && jobsRes.ok) {
+          const j = await jobsRes.json();
+          setEditJobOptions(Array.isArray(j) ? j : Array.isArray(j?.data) ? j.data : []);
+        }
+        if (!cancelled && skillsRes.ok) {
+          const s = await skillsRes.json();
+          setEditSkillOptions(Array.isArray(s) ? s : Array.isArray(s?.data) ? s.data : []);
+        }
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [modal]);
 
   useEffect(() => {
     if (!modal) return;
@@ -1081,6 +1207,9 @@ export default function ClientDashboard() {
 
   const saveEdit = async () => {
     try {
+      const yearNumber =
+        draft.year.trim() === "" ? null : Number.parseInt(draft.year.trim(), 10);
+
       const payload = {
         first_name: draft.firstName,
         last_name: draft.lastName,
@@ -1090,12 +1219,12 @@ export default function ClientDashboard() {
         address: draft.address,
         about_me: draft.about,
         avatar_choice: me.avatarChoiceId,
-        university: me.university,
-        faculty: me.faculty,
-        major: me.major,
-        year: me.year,
-        interests: me.interests,
-        skill: me.skill,
+        university: draft.university,
+        faculty: draft.faculty,
+        major: draft.major,
+        year: yearNumber,
+        interests: draft.jobSelected,
+        skill: draft.skillSelected,
       };
 
       const res = await fetch("/api/student", {
@@ -1115,6 +1244,8 @@ export default function ClientDashboard() {
 
       const fullName = `${draft.firstName} ${draft.lastName}`.trim() || me.name;
 
+      const educParts = [draft.university, draft.faculty, draft.major, draft.year ? `Year ${draft.year}` : ""].filter(Boolean);
+
       setMe((prev) =>
         prev
           ? {
@@ -1127,6 +1258,13 @@ export default function ClientDashboard() {
             email: draft.email,
             address: draft.address,
             bio: draft.about,
+            university: draft.university,
+            faculty: draft.faculty,
+            major: draft.major,
+            year: draft.year,
+            education: educParts.join(" • ") || prev.education,
+            interests: draft.jobSelected,
+            skill: draft.skillSelected,
           }
           : prev
       );
@@ -1183,25 +1321,34 @@ export default function ClientDashboard() {
             <StudentCalendar siteEvents={schedules} />
           </div>
 
-          {modal && (
-            <ModalShell onClose={() => setModal(null)}>
-              {modal === "editProfile" && (
-                <EditProfileModal
-                  draft={draft}
-                  setDraft={setDraft}
-                  onCancel={() => setModal(null)}
-                  onSave={saveEdit}
-                />
-              )}
-
-              {modal === "badges" && (
-                <GridModal title="Badges" items={portfolioBadges} onClose={() => setModal(null)} />
-              )}
-
-              {modal === "certificate" && (
-                <GridModal title="Certificate" items={portfolioCerts} onClose={() => setModal(null)} />
-              )}
+          {modal === "editProfile" && (
+            <ModalShell
+              title="Personal Information"
+              onClose={() => setModal(null)}
+              footer={
+                <>
+                  <button className={styles.secondaryBtn} type="button" onClick={() => setModal(null)} aria-label="Cancel"><img src="/images/icons/button02-icon.png" alt="Cancel" className={styles.iconBtnImg} /></button>
+                  <button className={styles.primaryBtn} type="button" onClick={saveEdit} aria-label="Save"><img src="/images/icons/button01-icon.png" alt="Save" className={styles.iconBtnImg} /></button>
+                </>
+              }
+            >
+              <EditProfileModal
+                draft={draft}
+                setDraft={setDraft}
+                jobOptions={editJobOptions}
+                skillOptions={editSkillOptions}
+                onCancel={() => setModal(null)}
+                onSave={saveEdit}
+              />
             </ModalShell>
+          )}
+
+          {modal === "badges" && (
+            <GridModal title="Badges" count={8} onClose={() => setModal(null)} />
+          )}
+
+          {modal === "certificate" && (
+            <GridModal title="Certificate" count={6} onClose={() => setModal(null)} />
           )}
 
           {cropOpen && cropUrl && (
@@ -1411,7 +1558,7 @@ function TopProfileRow({
           aria-label="Edit personal information"
           onClick={onEdit}
         >
-          ✎
+          <img src="/images/icons/button03-icon.png" alt="Edit" className={styles.iconBtnImg} />
         </button>
 
         <div className={styles.bioInformation}>
@@ -1533,48 +1680,55 @@ function MidRow({
         </div>
 
         <div className={styles.skillViewport}>
-          <div
-            className={styles.skillScroll}
-            role="region"
-            aria-label="Skill progress list"
-          >
-            <div className={styles.skillRow}>
-              {skills.length > 0 ? (
-                skills.map((s, i) => (
-                  <div key={s.id} className={styles.skillCol}>
-                    <div className={styles.skillPct}>{s.percent}%</div>
+          {skills.length === 0 ? (
+            <div style={{ padding: "20px 0", fontSize: 13, color: "#888" }}>
+              No skill progress data yet.
+            </div>
+          ) : (
+            <div
+              className={styles.skillScroll}
+              role="region"
+              aria-label="Skill progress list"
+            >
+              <div className={styles.skillRow}>
+                {skills.map((skill, i) => (
+                  <div key={skill.id} className={styles.skillCol}>
+                    <div className={styles.skillPct}>Level {skill.level}</div>
+                    <div className={styles.skillPhase}>{skill.bloomPhase}</div>
 
                     <div className={styles.skillTube}>
                       <div
                         className={cx(
                           styles.skillFill,
-                          i === 0 && styles.trackGreenWide,
-                          i === 1 && styles.trackPink,
-                          i === 2 && styles.trackYellow,
-                          i === 3 && styles.trackGreen,
-                          i === 4 && styles.trackSoftPink,
-                          i === 5 && styles.trackBlue,
-                          i === 6 && styles.trackOrange,
-                          i === 7 && styles.trackRose,
-                          i === 8 && styles.trackSoftPink,
-                          i === 9 && styles.trackBlue,
-                          i === 10 && styles.trackOrange,
-                          i === 11 && styles.trackRose
+                          i % 16 === 0 && styles.trackGreenWide,
+                          i % 16 === 1 && styles.trackPink,
+                          i % 16 === 2 && styles.trackYellow,
+                          i % 16 === 3 && styles.trackGreen,
+                          i % 16 === 4 && styles.trackSoftPink,
+                          i % 16 === 5 && styles.trackBlue,
+                          i % 16 === 6 && styles.trackOrange,
+                          i % 16 === 7 && styles.trackRose,
+                          i % 16 === 8 && styles.trackSoftPink,
+                          i % 16 === 9 && styles.trackBlue,
+                          i % 16 === 10 && styles.trackOrange,
+                          i % 16 === 11 && styles.trackRose,
+                          i % 16 === 12 && styles.trackSoftPink,
+                          i % 16 === 13 && styles.trackBlue,
+                          i % 16 === 14 && styles.trackOrange,
+                          i % 16 === 15 && styles.trackRose
                         )}
-                        style={{ height: `${s.percent}%` }}
+                        style={{ height: `${skill.fillPercent}%` }}
                       />
                     </div>
 
-                    <div className={styles.skillLabel} title={s.name}>
-                      {s.name}
+                    <div className={styles.skillLabel} title={skill.name}>
+                      {skill.name}
                     </div>
                   </div>
-                ))
-              ) : (
-                <div style={{ padding: 16 }}>No skills</div>
-              )}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </section>
     </div>
@@ -2289,11 +2443,25 @@ function CalendarCard({
   );
 }
 
-function ModalShell({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+function ModalShell({ title, onClose, children, footer }: {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+  footer: React.ReactNode;
+}) {
   return (
-    <div className={styles.modalOverlay} role="dialog" aria-modal="true" onMouseDown={onClose}>
-      <div className={styles.modalCard} onMouseDown={(e) => e.stopPropagation()}>
-        {children}
+    <div className={styles.modalOverlay} role="dialog" aria-modal="true">
+      <div className={styles.modal}>
+        <div className={styles.modalHeader}>
+          <h2 className={styles.modalTitle}>{title}</h2>
+          <button className={styles.modalClose} type="button" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+        <div className={styles.modalBody}>
+          {children}
+        </div>
+        <div className={styles.modalFooter}>
+          {footer}
+        </div>
       </div>
     </div>
   );
@@ -2302,40 +2470,58 @@ function ModalShell({ onClose, children }: { onClose: () => void; children: Reac
 function EditProfileModal({
   draft,
   setDraft,
+  jobOptions,
+  skillOptions,
   onCancel,
   onSave,
 }: {
   draft: {
-    firstName: string;
-    lastName: string;
-    birthDate: string;
-    phone: string;
-    email: string;
-    address: string;
-    about: string;
+    firstName: string; lastName: string; birthDate: string; phone: string;
+    email: string; address: string; about: string;
+    university: string; faculty: string; major: string; year: string;
+    jobSelected: string[]; skillSelected: string[];
   };
   setDraft: React.Dispatch<React.SetStateAction<any>>;
+  jobOptions: Array<{id:string;name:string}>;
+  skillOptions: Array<{id:string;name:string}>;
   onCancel: () => void;
   onSave: () => void;
 }) {
+  const [openJob, setOpenJob] = useState(false);
+  const [openSkill, setOpenSkill] = useState(false);
+
+  const toggleJob = (id: string) =>
+    setDraft((p: any) => ({
+      ...p,
+      jobSelected: p.jobSelected.includes(id)
+        ? p.jobSelected.filter((x: string) => x !== id)
+        : [...p.jobSelected, id],
+    }));
+
+  const toggleSkill = (id: string) =>
+    setDraft((p: any) => ({
+      ...p,
+      skillSelected: p.skillSelected.includes(id)
+        ? p.skillSelected.filter((x: string) => x !== id)
+        : [...p.skillSelected, id],
+    }));
+
   return (
     <>
-      <div className={styles.modalTitle}>Personal Information</div>
-
       <div className={styles.modalForm}>
-        <Field label="First name">
-          <input className={styles.modalInput} value={draft.firstName} onChange={(e) => setDraft((p: any) => ({ ...p, firstName: e.target.value }))} />
-        </Field>
-
-        <Field label="Last name">
-          <input className={styles.modalInput} value={draft.lastName} onChange={(e) => setDraft((p: any) => ({ ...p, lastName: e.target.value }))} />
-        </Field>
+        <div className={styles.modalGrid2}>
+          <Field label="First name">
+            <input className={styles.modalInput} value={draft.firstName} onChange={(e) => setDraft((p: any) => ({ ...p, firstName: e.target.value }))} />
+          </Field>
+          <Field label="Last name">
+            <input className={styles.modalInput} value={draft.lastName} onChange={(e) => setDraft((p: any) => ({ ...p, lastName: e.target.value }))} />
+          </Field>
+        </div>
 
         <div className={styles.modalGrid2}>
           <Field label="Birth date">
-            <input className={styles.modalInput} value={draft.birthDate} onChange={(e) => setDraft((p: any) => ({ ...p, birthDate: e.target.value }))} />
+            <input className={styles.modalInput} type="date" value={draft.birthDate} onChange={(e) => setDraft((p: any) => ({ ...p, birthDate: e.target.value }))} />
           </Field>
-
           <Field label="Phone number">
             <input className={styles.modalInput} value={draft.phone} onChange={(e) => setDraft((p: any) => ({ ...p, phone: e.target.value }))} />
           </Field>
@@ -2352,17 +2538,89 @@ function EditProfileModal({
         <Field label="About me">
           <textarea className={styles.modalTextarea} value={draft.about} onChange={(e) => setDraft((p: any) => ({ ...p, about: e.target.value }))} />
         </Field>
+
+        <div className={styles.modalHr} />
+
+        <Field label="University">
+          <input className={styles.modalInput} value={draft.university} onChange={(e) => setDraft((p: any) => ({ ...p, university: e.target.value }))} />
+        </Field>
+
+        <Field label="Faculty">
+          <input className={styles.modalInput} value={draft.faculty} onChange={(e) => setDraft((p: any) => ({ ...p, faculty: e.target.value }))} />
+        </Field>
+
+        <div className={styles.modalGrid2}>
+          <Field label="Major">
+            <input className={styles.modalInput} value={draft.major} onChange={(e) => setDraft((p: any) => ({ ...p, major: e.target.value }))} />
+          </Field>
+          <Field label="Year">
+            <input className={styles.modalInput} value={draft.year} inputMode="numeric" onChange={(e) => setDraft((p: any) => ({ ...p, year: e.target.value }))} />
+          </Field>
+        </div>
+
+        <div className={styles.modalHr} />
+
+        <button type="button" className={styles.modalPickField} onClick={() => setOpenJob((v) => !v)}>
+          <span className={draft.jobSelected.length ? undefined : styles.modalPickPlaceholder}>
+            {draft.jobSelected.length
+              ? jobOptions.filter((o) => draft.jobSelected.includes(o.id)).map((o) => o.name).join(", ") || "Job of interest"
+              : "Job of interest"}
+          </span>
+        </button>
+        {openJob && (
+          <EditSelectorBox title="Job of interest" options={jobOptions} selectedIds={draft.jobSelected} onToggle={toggleJob} />
+        )}
+
+        <button type="button" className={styles.modalPickField} onClick={() => setOpenSkill((v) => !v)}>
+          <span className={draft.skillSelected.length ? undefined : styles.modalPickPlaceholder}>
+            {draft.skillSelected.length
+              ? skillOptions.filter((o) => draft.skillSelected.includes(o.id)).map((o) => o.name).join(", ") || "Your skills"
+              : "Your skills"}
+          </span>
+        </button>
+        {openSkill && (
+          <EditSelectorBox title="Your skills" options={skillOptions} selectedIds={draft.skillSelected} onToggle={toggleSkill} />
+        )}
       </div>
 
-      <div className={styles.modalActions}>
-        <button className={cx(styles.modalBtn, styles.modalOk)} type="button" onClick={onSave} aria-label="Save">
-          ✓
-        </button>
-        <button className={cx(styles.modalBtn, styles.modalCancel)} type="button" onClick={onCancel} aria-label="Cancel">
-          ✕
-        </button>
-      </div>
     </>
+  );
+}
+
+function EditSelectorBox({
+  title, options, selectedIds, onToggle,
+}: {
+  title: string;
+  options: Array<{id:string;name:string}>;
+  selectedIds: string[];
+  onToggle: (id: string) => void;
+}) {
+  const [q, setQ] = useState("");
+  const filtered = options.filter((o) =>
+    !q.trim() || o.name.toLowerCase().includes(q.trim().toLowerCase())
+  );
+  return (
+    <div className={styles.modalSelectorBox}>
+      <div className={styles.modalSelectorTag}>{title}</div>
+      <div className={styles.modalSearchRow}>
+        <span className={styles.modalSearchIcon}>⌕</span>
+        <input className={styles.modalSearchInput} placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} />
+      </div>
+      <div className={styles.modalOptionGrid}>
+        {filtered.map((o) => {
+          const on = selectedIds.includes(o.id);
+          return (
+            <div key={o.id} className={styles.modalOptionItem} role="button" tabIndex={0}
+              onClick={() => onToggle(o.id)}
+              onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onToggle(o.id)}
+            >
+              <div className={cx(styles.modalCheckBox, on && styles.modalCheckBoxOn)}>{on ? "✓" : ""}</div>
+              <div className={styles.modalOptionLabel}>{o.name}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -2385,36 +2643,18 @@ function GridModal({
   onClose: () => void;
 }) {
   return (
-    <>
-      <div className={styles.modalTitle}>{title}</div>
+    <ModalShell
+      title={title}
+      onClose={onClose}
+      footer={
+        <button className={styles.primaryBtn} type="button" onClick={onClose} aria-label="Close"><img src="/images/icons/button01-icon.png" alt="Close" className={styles.iconBtnImg} /></button>
+      }
+    >
       <div className={styles.modalGridBadges}>
-        {items.length === 0 ? (
-          <div style={{ gridColumn: "1 / -1", padding: "16px 0", fontSize: 14, color: "#888" }}>
-            No {title.toLowerCase()} yet
-          </div>
-        ) : (
-          items.map((item) => (
-            <div key={item.id} className={styles.modalBadgeBox} title={item.title}>
-              {item.badgeLink ? (
-                <img
-                  src={item.badgeLink}
-                  alt={item.title}
-                  style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4 }}
-                />
-              ) : (
-                <div style={{ fontSize: 11, padding: 4, wordBreak: "break-word", textAlign: "center" }}>
-                  {item.title}
-                </div>
-              )}
-            </div>
-          ))
-        )}
+        {Array.from({ length: count }).map((_, i) => (
+          <div key={i} className={styles.modalBadgeBox} />
+        ))}
       </div>
-      <div className={styles.modalActions}>
-        <button className={cx(styles.modalBtn, styles.modalOk)} type="button" onClick={onClose} aria-label="Close">
-          ✓
-        </button>
-      </div>
-    </>
+    </ModalShell>
   );
 }

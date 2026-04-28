@@ -1117,7 +1117,7 @@ function AddSkillModal({
         const category = skill.skillCategory.toLowerCase();
         return name.includes(keyword) || category.includes(keyword);
       })
-      .slice(0, 10);
+      .slice(0, keyword ? 50 : 200);
   }, [availableSkills, formValue.searchText, selectedSkillIds]);
 
   const shouldShowDropdown =
@@ -1909,7 +1909,7 @@ function AccessAndScheduleSection({
   defaultEnrollmentRange: RangeValue;
   defaultActivityRange: RangeValue;
 }) {
-  const [isUnlimited, setIsUnlimited] = useState(defaultIsUnlimited);
+  const isUnlimited = false;
 
   return (
     <SectionCard className={styles.settingsPanel}>
@@ -1954,7 +1954,7 @@ function AccessAndScheduleSection({
             disabled={isUnlimited}
           />
         </div>
-        <button type="button" className={styles.unlimitedToggle} onClick={() => setIsUnlimited((p) => !p)}>
+        <button type="button" className={styles.unlimitedToggle} disabled style={{ cursor: "not-allowed", opacity: 0.5 }}>
           <CheckBoxIcon checked={isUnlimited} />
           <span>No</span>
         </button>
@@ -2084,7 +2084,7 @@ export default function ActivityMeeting() {
   const isEditMode = Boolean(editActivityId);
 
   const [selectedActivityType, setSelectedActivityType] = useState<ActivityKind>("meetings");
-  const [selectedActivityStatus, setSelectedActivityStatus] = useState<ActivityStatus>("draft");
+  const [selectedActivityStatus, setSelectedActivityStatus] = useState<ActivityStatus>("publish");
   const [selectedAudience, setSelectedAudience] = useState<AudienceAccess>("everyone");
   const [selectedParticipation, setSelectedParticipation] = useState<ParticipationMode>("scheduledParticipation");
   const [selectedLocation, setSelectedLocation] = useState<AttendanceLocation>("onsite");

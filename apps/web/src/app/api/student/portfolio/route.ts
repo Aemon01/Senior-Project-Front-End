@@ -77,6 +77,60 @@ function safeObject(value: unknown): Record<string, any> {
   return {};
 }
 
+function buildCandidateObjects(...values: unknown[]) {
+  const candidates: Record<string, any>[] = [];
+
+  const push = (value: unknown) => {
+    const obj = safeObject(value);
+    if (Object.keys(obj).length > 0) candidates.push(obj);
+  };
+
+  values.forEach((value) => {
+    const root = safeObject(value);
+    push(root);
+    push(root?.Info);
+    push(root?.info);
+    push(root?.student_info);
+    push(root?.studentInfo);
+    push(root?.StudentInfo);
+    push(root?.student);
+    push(root?.Student);
+    push(root?.profile);
+    push(root?.Profile);
+    push(root?.user);
+    push(root?.User);
+    push(root?.commonInfo);
+    push(root?.common_info);
+    push(root?.data);
+    push(root?.data?.Info);
+    push(root?.data?.info);
+    push(root?.data?.student_info);
+    push(root?.data?.studentInfo);
+  });
+
+  return candidates;
+}
+
+function pickStringFromObjects(objects: Record<string, any>[], ...keys: string[]) {
+  for (const obj of objects) {
+    for (const key of keys) {
+      const s = pickString(obj?.[key]);
+      if (s) return s;
+    }
+  }
+  return "";
+}
+
+function firstNonEmptyArray<T = any>(...values: unknown[]): T[] {
+  for (const value of values) {
+    if (Array.isArray(value) && value.length > 0) return value as T[];
+  }
+  for (const value of values) {
+    if (Array.isArray(value)) return value as T[];
+  }
+  return [];
+}
+
 function pickString(...values: unknown[]) {
   for (const value of values) {
     const s = String(value ?? "").trim();
@@ -222,76 +276,141 @@ async function getStdId(accessToken: string, idToken: string) {
   return students.find((s) => s?.user_id === user.user_id)?.std_id ?? null;
 }
 
-function normalizeStudentInfo(portfolioRoot: any, _dashboardRoot: any) {
-  const info = safeObject(portfolioRoot?.info ?? portfolioRoot?.Info ?? {});
+function normalizeStudentInfo(portfolioRoot: any, dashboardRoot: any, studentRoot: any) {
+  const infoObjects = buildCandidateObjects(portfolioRoot, dashboardRoot, studentRoot);
+
   return {
-    first_name: pickString(info.first_name, info.firstName),
-    last_name: pickString(info.last_name, info.lastName),
-    birth_date: normalizeDate(info.birth_date ?? info.birthDate),
-    phone: pickString(info.phone),
-    email: pickString(info.email),
-    address: pickString(info.address),
-    about_me: pickString(info.about_me, info.aboutMe),
-    profile_image_url: pickString(info.profile_image_url),
+    first_name: pickStringFromObjects(infoObjects, "first_name", "firstName", "FirstName", "name", "full_name", "fullName"),
+    last_name: pickStringFromObjects(infoObjects, "last_name", "lastName", "LastName", "surname", "family_name", "familyName"),
+    birth_date: normalizeDate(
+      pickStringFromObjects(infoObjects, "birth_date", "birthDate", "BirthDate", "dob", "date_of_birth")
+    ),
+    phone: pickStringFromObjects(infoObjects, "phone", "Phone", "phone_number", "phoneNumber"),
+    email: pickStringFromObjects(infoObjects, "email", "Email"),
+    address: pickStringFromObjects(infoObjects, "address", "Address", "location", "Location"),
+    about_me: pickStringFromObjects(infoObjects, "about_me", "aboutMe", "AboutMe", "bio", "description"),
+    profile_image_url: pickStringFromObjects(
+      infoObjects,
+      "profile_image_url",
+      "profileImageUrl",
+      "ProfileImageUrl",
+      "profile_url",
+      "image_url",
+      "imageUrl"
+    ),
+    avatar_image_url: pickStringFromObjects(
+      infoObjects,
+      "avatar_image_url",
+      "avatarImageUrl",
+      "AvatarImageUrl",
+      "avatar_url",
+      "avatarUrl"
+    ),
   };
 }
 
-function normalizeEducation(portfolioRoot: any) {
-  const list = safeArray<any>(portfolioRoot?.education ?? portfolioRoot?.Education ?? []);
-  return list.map((item, index) => ({
-    id: `education-${index}`,
-    school: pickString(item?.institution, item?.school, item?.university, item?.facultyschool),
-    degree: pickString(item?.degreeLevel, item?.degree_level, item?.degree),
-    faculty: pickString(item?.faculty),
-    fieldOfStudy: pickString(item?.major, item?.field_of_study, item?.fieldOfStudy),
-    start_year: String(item?.startYear ?? item?.start_year ?? ""),
-    end_year: String(item?.endYear ?? item?.end_year ?? ""),
-    gpa: pickString(item?.gpa),
-  }));
+function normalizeEducation(portfolioRoot: any, dashboardRoot: any, studentRoot: any) {
+  const list = firstNonEmptyArray<any>(
+    portfolioRoot?.Education,
+    portfolioRoot?.education,
+    dashboardRoot?.Education,
+    dashboardRoot?.education,
+    studentRoot?.Education,
+    studentRoot?.education
+  );
+
+  console.log("[normalizeEducation] raw list:", JSON.stringify(list));
+
+  return list
+    .map((item, index) => ({
+      id: `education-${index}`,
+      school: pickString(item?.institution, item?.school, item?.university, item?.facultyschool),
+      degree: pickString(item?.degreeLevel, item?.degree_level, item?.degree),
+      faculty: pickString(item?.faculty),
+      fieldOfStudy: pickString(item?.major, item?.field_of_study, item?.fieldOfStudy),
+      startYear: String(item?.startYear ?? item?.start_year ?? ""),
+      endYear: String(item?.endYear ?? item?.end_year ?? ""),
+      gpa: pickString(item?.gpa),
+    }))
+    .filter((item) => Boolean(item.school || item.degree || item.faculty || item.fieldOfStudy));
 }
 
 function normalizeSkills(portfolioRoot: any) {
-  const list = safeArray<any>(portfolioRoot?.skills ?? portfolioRoot?.Skills ?? []);
-  return list.map((item, index) => ({
-    id: pickString(item?.skillID, item?.skill_id) || `skill-${index}`,
-    name: pickString(item?.name, item?.Name),
-    kind: normalizeSkillKind(item?.category ?? item?.Category ?? item?.kind),
-    source: (item?.fromSystem === true || item?.FromSystem === true) ? "platform" : "upload",
-    isSelected: typeof item?.enable === "boolean" ? item.enable : (typeof item?.Enable === "boolean" ? item.Enable : true),
-  }));
+  const list = safeArray<any>(portfolioRoot?.Skills ?? portfolioRoot?.skills ?? []);
+  const seenIds = new Set<string>();
+  const seenNames = new Set<string>();
+  return list
+    .map((item, index) => ({
+      id: pickString(item?.skillID, item?.skill_id) || `skill-${index}`,
+      name: pickString(item?.name, item?.Name),
+      kind: normalizeSkillKind(item?.category ?? item?.Category ?? item?.kind),
+      source: (item?.fromSystem === true || item?.FromSystem === true) ? "platform" : "upload",
+      isSelected: typeof item?.enable === "boolean" ? item.enable : (typeof item?.Enable === "boolean" ? item.Enable : true),
+    }))
+    .filter((item) => {
+      if (!item.name) return false;
+      // dedup: prefer keeping the one with isSelected=true (by skillID first, then name+kind)
+      const nameKey = `${item.name.toLowerCase()}|${item.kind}`;
+      if (item.id && !item.id.startsWith("skill-")) {
+        if (seenIds.has(item.id)) return false;
+        seenIds.add(item.id);
+      } else {
+        if (seenNames.has(nameKey)) return false;
+        seenNames.add(nameKey);
+      }
+      return true;
+    });
 }
 
 function normalizeCertificates(portfolioRoot: any) {
-  const list = safeArray<any>(portfolioRoot?.certificates ?? portfolioRoot?.Certificates ?? []);
-  console.log("certificate list", list)
-  return list.map((item, index) => {
-    const typeStr = String(item?.Type ?? "certificate").toLowerCase();
-
-    return {
-      id: `certificate-${index}`,
-      itemType: typeStr === "badge" ? "badge" : "certificate",
-      title: pickString(item?.name, item?.Name, item?.title),
-      date: normalizeDate(item?.date ?? item?.issue_date),
-      badgeLink: pickString(item?.badgeLink, item?.badge_link),
-    };
-  });
+  const list = safeArray<any>(portfolioRoot?.Certificates ?? portfolioRoot?.certificates ?? []);
+  return list
+    .map((item, index) => {
+      const typeStr = String(item?.Type ?? item?.type ?? item?.itemType ?? "certificate").toLowerCase();
+      return {
+        id: pickString(item?.certificateID, item?.certificate_id, item?.id) || `certificate-${index}`,
+        itemType: typeStr === "badge" ? "badge" : "certificate",
+        title: pickString(item?.name, item?.Name, item?.title),
+        date: normalizeDate(item?.date ?? item?.issue_date),
+        badgeLink: pickString(item?.badgeLink, item?.badge_link),
+        source: (item?.fromSystem === true || item?.FromSystem === true || item?.source === "platform") ? "platform" : "upload",
+        isSelected: typeof item?.enable === "boolean" ? item.enable : (typeof item?.Enable === "boolean" ? item.Enable : true),
+      };
+    })
+    .filter((item) => Boolean(item.title)); // filter empty certificates
 }
 
 function normalizeExperiences(portfolioRoot: any) {
-  const list = safeArray<any>(portfolioRoot?.experience ?? portfolioRoot?.Experience ?? []);
-  return list.map((item, index) => {
-    const start = String(item?.StartYear ?? item?.start_year ?? "");
-    const end = String(item?.EndYear ?? item?.end_year ?? "");
-    const period = start && end ? `${start} - ${end}` : start || end || "";
-    return {
-      id: pickString(item?.activityID, item?.ActivityID) || `experience-${index}`,
-      period,
-      title: pickString(item?.topic, item?.Topic),
-      description: pickString(item?.description, item?.Description),
-      source: (item?.fromSystem === true || item?.FromSystem === true) ? "platform" : "upload",
-      files: [],
-    };
-  });
+  const list = safeArray<any>(portfolioRoot?.Experience ?? portfolioRoot?.experience ?? []);
+  const seen = new Set<string>();
+  return list
+    .map((item, index) => {
+      const start = String(item?.startYear ?? item?.StartYear ?? item?.start_year ?? "");
+      const end = String(item?.endYear ?? item?.EndYear ?? item?.end_year ?? "");
+      const startNum = parseInt(start) || 0;
+      const endNum = parseInt(end) || 0;
+      const period = startNum && endNum
+        ? `${startNum} - ${endNum}`
+        : startNum ? String(startNum) : endNum ? String(endNum) : "";
+      // Preserve enable field so client knows which platform items are active/inactive
+      const enable = typeof item?.enable === "boolean" ? item.enable : true;
+      return {
+        id: pickString(item?.activityID, item?.ActivityID) || `experience-${index}`,
+        period,
+        title: pickString(item?.topic, item?.Topic),
+        description: pickString(item?.description, item?.Description),
+        source: (item?.fromSystem === true || item?.FromSystem === true) ? "platform" : "upload",
+        enable,
+        files: [],
+      };
+    })
+    .filter((item) => {
+      // Filter out mock data but KEEP disabled platform items (enable=false)
+      if (!item.title || item.title === "string") return false;
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
 }
 
 function buildBackendPayload(type: PortfolioType, body: any) {
@@ -339,7 +458,8 @@ function buildBackendPayload(type: PortfolioType, body: any) {
       name: pickString(item?.name, item?.title),
       type: String(item?.itemType ?? item?.type ?? "certificate"),
       badgeLink: pickString(item?.badgeLink, item?.badge_link),
-      enable: typeof item?.enable === "boolean" ? item.enable : true,
+      fromSystem: item?.source === "platform" || item?.fromSystem === true,
+      enable: typeof item?.isSelected === "boolean" ? item.isSelected : (typeof item?.enable === "boolean" ? item.enable : true),
     }));
   }
 
@@ -432,54 +552,35 @@ export async function GET(req: Request) {
     //   ]
     // }
 
-    const [portfolioJson, dashboardJson] = await Promise.all([
+    const [portfolioJson, dashboardJson, studentJson] = await Promise.all([
       tryFetchJson(`${BACKEND}/student/${stdId}/portfolio`, sess.accessToken),
       tryFetchJson(`${BACKEND}/student/${stdId}/dashboard`, sess.accessToken),
       tryFetchJson(`${BACKEND}/student/${stdId}`, sess.accessToken),
     ]);
 
-    const portfolioRoot = portfolioJson?.data ?? portfolioJson ?? {};
-    // merge student base info into dashboardRoot.student_info
-    const studentBase = studentJson?.data ?? studentJson ?? {};
-    const studentInfo = studentBase?.student_info ?? studentBase ?? {};
-    const dashboardData = dashboardJson?.data ?? dashboardJson ?? {};
-    const dashboardRoot = {
-      ...dashboardData,
-      student_info: {
-        ...studentInfo,
-        ...(dashboardData?.student_info ?? {}),
-      },
-    };
+    // Backend may wrap with: { data: {...} } or { std_id: {...} } or flat
+    function unwrapPortfolio(json: any): any {
+      if (!json) return {};
+      // { data: { Info, Education, ... } }
+      if (json?.data?.Info || json?.data?.Education || json?.data?.Skills) return json.data;
+      if (json?.data) return json.data;
+      // { std_id: { Info, Education, ... } } — std_id is a dynamic UUID key
+      const keys = Object.keys(json);
+      if (keys.length === 1 && json[keys[0]]?.Info !== undefined) return json[keys[0]];
+      // flat: { Info, Education, ... }
+      if (json?.Info || json?.Education) return json;
+      return json;
+    }
 
-    const normalizedExperiences = normalizeExperiences(portfolioRoot);
+    const portfolioRoot = unwrapPortfolio(portfolioJson);
+    const dashboardRoot = unwrapPortfolio(dashboardJson);
+    const studentRoot = unwrapPortfolio(studentJson);
 
-    // ถ้า portfolio ไม่มี experience เลย ให้ดึง done_activities จาก dashboard มาแสดงเป็น platform experience
-    const doneActivities: any[] = Array.isArray(dashboardData?.done_activities) ? dashboardData.done_activities : [];
-    const platformActivities = doneActivities
-      .filter((a: any) => a?.activity_name || a?.ActivityName)
-      .map((a: any, i: number) => ({
-        id: String(a?.activity_id ?? a?.ActivityID ?? `platform-exp-${i}`),
-        period: (() => {
-          const start = String(a?.start_at ?? a?.run_start_at ?? "").slice(0, 4);
-          const end = String(a?.end_at ?? a?.run_end_at ?? "").slice(0, 4);
-          return start && end && start !== end ? `${start} - ${end}` : start || end || "";
-        })(),
-        title: String(a?.activity_name ?? a?.ActivityName ?? ""),
-        description: String(a?.activity_detail ?? a?.description ?? ""),
-        source: "platform",
-        files: [],
-      }))
-      .filter((e: any) => e.title);
-
-    const finalExperiences = normalizedExperiences.length > 0
-      ? normalizedExperiences
-      : platformActivities;
-
-    // console.log("portfolioRoot: ", portfolioRoot);
-    // console.log("dashboardRoot: ", dashboardRoot);
+    console.log("portfolioRoot keys: ", portfolioRoot ? Object.keys(portfolioRoot) : "null");
+    console.log("portfolioRoot.Info: ", portfolioRoot?.Info ?? portfolioRoot?.info ?? "NOT FOUND");
     var data = {
-      student_info: normalizeStudentInfo(portfolioRoot, dashboardRoot),
-      education: normalizeEducation(portfolioRoot),
+      student_info: normalizeStudentInfo(portfolioRoot, dashboardRoot, studentRoot),
+      education: normalizeEducation(portfolioRoot, dashboardRoot, studentRoot),
       skills: normalizeSkills(portfolioRoot),
       certificates: normalizeCertificates(portfolioRoot),
       experiences: normalizeExperiences(portfolioRoot),
@@ -535,7 +636,8 @@ export async function PUT(req: Request) {
     const body = await req.json();
     const payload = buildBackendPayload(type, body);
 
-    console.log("payload: ", payload);
+    console.log("payload: ", JSON.stringify(payload, null, 2));
+    console.log("[PUT experience] enable values:", type === "experience" ? (Array.isArray(payload) ? payload.map((i: any) => ({ id: i.activityID, enable: i.enable })) : "not array") : "n/a");
 
     const result = await updatePortfolioBackend(
       stdId,

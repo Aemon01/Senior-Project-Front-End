@@ -27,6 +27,8 @@ type CertificateItem = {
     date: string;
     itemType: "certificate" | "badge";
     badgeLink: string;
+    source: ItemSource;
+    isSelected: boolean;
 };
 
 type ExperienceItem = {
@@ -133,74 +135,10 @@ const emptySkillForm: SkillFormState = {
     source: "upload",
 };
 
-const platformSkillOptions: SkillItem[] = [
-    // { id: "ps1", name: "Presentation", kind: "soft", source: "platform", isSelected: true },
-    // { id: "ps2", name: "Communication", kind: "soft", source: "platform", isSelected: false },
-    // { id: "ps3", name: "Teamwork", kind: "soft", source: "platform", isSelected: false },
-    // { id: "ps4", name: "Problem Solving", kind: "soft", source: "platform", isSelected: false },
-    // { id: "ps5", name: "React", kind: "technical", source: "platform", isSelected: false },
-    // { id: "ps6", name: "TypeScript", kind: "technical", source: "platform", isSelected: false },
-    // { id: "ps7", name: "Cloud Computing", kind: "technical", source: "platform", isSelected: false },
-];
-
-const platformCertificateOptions: CertificateItem[] = [
-    // { id: "pc1", title: "AWS Basic Cloud Computing", date: "01/07/2025", itemType: "certificate", badgeLink: "" },
-    // { id: "pc2", title: "VCEP Python Basic", date: "01/07/2025", itemType: "badge", badgeLink: "" },
-];
-
-const platformExperienceOptions: ExperienceItem[] = [
-    // {
-    //     id: "pe1",
-    //     period: "2024 - 2025",
-    //     title: "Python Basic",
-    //     description:
-    //         "Accessed basic Python classes in the VCEP platform and learned programming fundamentals, syntax, and problem-solving practice.",
-    //     source: "platform",
-    //     files: [],
-    // },
-    // {
-    //     id: "pe2",
-    //     period: "2025",
-    //     title: "UI Layout Explanation Task",
-    //     description:
-    //         "Designed and explained interface layouts with attention to readability, hierarchy, and responsive structure.",
-    //     source: "platform",
-    //     files: [],
-    // },
-    // {
-    //     id: "pe3",
-    //     period: "2025",
-    //     title: "Responsive Web Page Workshop",
-    //     description:
-    //         "Built responsive page sections and improved alignment, spacing, and component scaling for multiple screen sizes.",
-    //     source: "platform",
-    //     files: [],
-    // },
-];
+// platformSkillOptions and platformExperienceOptions are now derived dynamically from state
 
 function makeId(prefix: string) {
     return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-const PUBLIC_ASSET_BASE =
-    process.env.NEXT_PUBLIC_S3_PUBLIC_BASE_URL ||
-    process.env.NEXT_PUBLIC_ASSETS_PUBLIC_BASE ||
-    "https://vcep-assets-dev.s3.ap-southeast-2.amazonaws.com";
-
-function resolveImageUrl(value: string | null | undefined): string {
-    const raw = String(value ?? "").trim();
-    if (!raw) return "";
-    // already full URL
-    if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
-    // s3:// scheme — strip bucket, use key
-    if (raw.startsWith("s3://")) {
-        const withoutScheme = raw.replace("s3://", "");
-        const slashIdx = withoutScheme.indexOf("/");
-        const key = slashIdx >= 0 ? withoutScheme.slice(slashIdx + 1) : "";
-        return key ? `${PUBLIC_ASSET_BASE.replace(/\/+$/, "")}/${key.replace(/^\/+/, "")}` : "";
-    }
-    // bare key (with or without leading slash)
-    return `${PUBLIC_ASSET_BASE.replace(/\/+$/, "")}/${raw.replace(/^\/+/, "")}`;
 }
 
 function getSourceIcon(source: ItemSource) {
@@ -303,24 +241,57 @@ function toCertificatesPayload(items: CertificateItem[]) {
         name: item.title.trim(),
         type: item.itemType,
         badgeLink: item.badgeLink,
-        enable: true,
+        fromSystem: item.source === "platform",
+        enable: item.isSelected,
     }));
 }
 
-function toExperiencesPayload(items: ExperienceItem[]) {
-    return items.map((item) => {
+function toExperiencesPayload(enabledItems: ExperienceItem[], allPlatform: ExperienceItem[] = []) {
+    const seen = new Set<string>();
+    const enabledById = new Set<string>();
+    const payload: Array<{
+        activityID: string;
+        topic: string;
+        description: string;
+        startYear: number;
+        endYear: number;
+        fromSystem: boolean;
+        enable: boolean;
+        externalWebsite: string;
+    }> = [];
+
+    const pushItem = (item: ExperienceItem, enable: boolean) => {
+        if (!item.id || seen.has(item.id)) return;
+        seen.add(item.id);
+
         const { startYear, endYear } = parsePeriodYears(item.period);
-        return {
+        payload.push({
             activityID: item.id,
             topic: item.title.trim(),
             description: item.description.trim(),
             startYear,
             endYear,
             fromSystem: item.source === "platform",
-            enable: true,
+            enable,
             externalWebsite: "",
-        };
-    });
+        });
+    };
+
+    enabledItems
+        .filter((item) => Boolean(item.id && item.title.trim()))
+        .forEach((item) => {
+            enabledById.add(item.id);
+            pushItem(item, true);
+        });
+
+    allPlatform
+        .filter((item) => item.source === "platform" && Boolean(item.id && item.title.trim()))
+        .forEach((item) => {
+            if (enabledById.has(item.id)) return;
+            pushItem(item, false);
+        });
+
+    return payload;
 }
 
 export default function PortfolioPage() {
@@ -349,7 +320,8 @@ export default function PortfolioPage() {
     const [skills, setSkills] = useState<SkillItem[]>([]);
     const [certificates, setCertificates] = useState<CertificateItem[]>([]);
     const [experiences, setExperiences] = useState<ExperienceItem[]>([]);
-    const [apiPlatformExperiences, setApiPlatformExperiences] = useState<ExperienceItem[]>([]);
+    // เก็บ platform activities ทั้งหมดจาก backend เพื่อใช้ใน "Select from platform"
+    const [allPlatformExperiences, setAllPlatformExperiences] = useState<ExperienceItem[]>([]);
 
     // const [educationList, setEducationList] = useState([
     //     "Suankularb Wittayalai (2015 - 2021) (GPA: 3.99)",
@@ -428,8 +400,29 @@ export default function PortfolioPage() {
     const [editingExperienceIndex, setEditingExperienceIndex] = useState<number | null>(null);
 
     const fullName = useMemo(() => `${form.firstName} ${form.lastName}`.trim(), [form.firstName, form.lastName]);
+    // "Current items" = selected skills only; "Select from platform" = platform skills that are deselected
+    const selectedSkills = useMemo(() => skills.filter((item) => item.isSelected), [skills]);
     const softSkills = useMemo(() => skills.filter((item) => item.kind === "soft" && item.isSelected), [skills]);
     const technicalSkills = useMemo(() => skills.filter((item) => item.kind === "technical" && item.isSelected), [skills]);
+    // Platform skills not currently shown → appear in "Select from platform"
+    const platformSkillOptions = useMemo(() => skills.filter((item) => item.source === "platform" && !item.isSelected), [skills]);
+    // "Current items" for experience = enabled (isSelected not needed, all experiences in array are "active")
+    // Platform experiences = all platform activities that are NOT currently in experiences list
+    const platformExperienceOptions = useMemo(
+        () => allPlatformExperiences.filter(
+            (opt) => !experiences.some((exp) => exp.id === opt.id)
+        ),
+        [allPlatformExperiences, experiences]
+    );
+    // Platform certificates = platform certs that are NOT currently selected
+    const platformCertificateOptions = useMemo(
+        () => certificates.filter((item) => item.source === "platform" && !item.isSelected),
+        [certificates]
+    );
+    const visibleCertificates = useMemo(
+        () => certificates.filter((item) => item.source === "upload" || item.isSelected),
+        [certificates]
+    );
 
     useEffect(() => {
         if (!showSave) return;
@@ -542,6 +535,7 @@ export default function PortfolioPage() {
 
     async function savePortfolioSection(type: "info" | "education" | "skills" | "certificate" | "experience", payload: unknown) {
         setIsSaving(true);
+        console.log(`[savePortfolioSection] type=${type} payload=`, JSON.stringify(payload));
 
         try {
             const res = await fetch(`/api/student/portfolio?type=${type}`, {
@@ -723,12 +717,15 @@ export default function PortfolioPage() {
 
     async function onSaveCertificateForm() {
         try {
+            const existingItem = editingCertificateIndex === null ? null : certificates[editingCertificateIndex] ?? null;
             const nextItem: CertificateItem = {
-                id: editingCertificateIndex === null ? makeId("certificate") : certificates[editingCertificateIndex]?.id ?? makeId("certificate"),
+                id: editingCertificateIndex === null ? makeId("certificate") : existingItem?.id ?? makeId("certificate"),
                 title: certificateForm.title.trim() || "New Certificate",
                 date: certificateForm.date.trim() || "DD/MM/YYYY",
                 itemType: certificateForm.itemType,
                 badgeLink: certificateForm.badgeLink,
+                source: existingItem?.source ?? "upload",
+                isSelected: existingItem?.isSelected ?? true,
             };
 
             const nextList = editingCertificateIndex === null
@@ -753,14 +750,19 @@ export default function PortfolioPage() {
     }
 
     async function onSelectPlatformCertificate(option: CertificateItem) {
-        const exists = certificates.some(
+        const optionIndex = certificates.findIndex(
             (item) =>
-                item.title.trim().toLowerCase() === option.title.trim().toLowerCase() &&
-                item.date.trim() === option.date.trim()
+                item.id === option.id ||
+                (
+                    item.source === "platform" &&
+                    item.title.trim().toLowerCase() === option.title.trim().toLowerCase() &&
+                    item.date.trim() === option.date.trim()
+                )
         );
-        if (exists) return;
 
-        const nextList = [...certificates, { ...option, id: makeId("certificate") }];
+        const nextList: CertificateItem[] = optionIndex >= 0
+            ? certificates.map((item, index) => (index === optionIndex ? { ...item, isSelected: true } : item))
+            : [...certificates, { ...option, id: makeId("certificate"), source: "platform", isSelected: true }];
 
         try {
             await savePortfolioSection("certificate", toCertificatesPayload(nextList));
@@ -806,7 +808,7 @@ export default function PortfolioPage() {
                 ? [...experiences, nextItem]
                 : experiences.map((item, index) => (index === editingExperienceIndex ? nextItem : item));
 
-            await savePortfolioSection("experience", toExperiencesPayload(nextList));
+            await savePortfolioSection("experience", toExperiencesPayload(nextList, allPlatformExperiences));
             setExperiences(nextList);
             setExperienceForm(emptyExperienceForm);
             setEditingExperienceIndex(null);
@@ -832,10 +834,10 @@ export default function PortfolioPage() {
         );
         if (exists) return;
 
-        const nextList = [...experiences, { ...option, id: makeId("experience"), files: [] }];
+        const nextList = [...experiences, { ...option, files: [] }];
 
         try {
-            await savePortfolioSection("experience", toExperiencesPayload(nextList));
+            await savePortfolioSection("experience", toExperiencesPayload(nextList, allPlatformExperiences));
             setExperiences(nextList);
         } catch (error: any) {
             console.error("Failed to add platform experience:", error);
@@ -913,14 +915,17 @@ export default function PortfolioPage() {
             }
 
             if (deleteTarget === "certificate") {
-                const nextList = certificates.filter((_, i) => i !== deleteIndex);
+                const item = certificates[deleteIndex];
+                const nextList = item?.source === "platform"
+                    ? certificates.map((certificate, i) => (i === deleteIndex ? { ...certificate, isSelected: false } : certificate))
+                    : certificates.filter((_, i) => i !== deleteIndex);
                 await savePortfolioSection("certificate", toCertificatesPayload(nextList));
                 setCertificates(nextList);
             }
 
             if (deleteTarget === "experience") {
                 const nextList = experiences.filter((_, i) => i !== deleteIndex);
-                await savePortfolioSection("experience", toExperiencesPayload(nextList));
+                await savePortfolioSection("experience", toExperiencesPayload(nextList, allPlatformExperiences));
                 setExperiences(nextList);
             }
 
@@ -976,11 +981,11 @@ export default function PortfolioPage() {
             setLoadedForm(nextForm);
 
             setPhotoUrl(
-                resolveImageUrl(
+                String(
                     info.profile_image_url ||
                     info.avatar_image_url ||
                     ""
-                )
+                ).trim()
             );
 
             setEducationList(
@@ -991,19 +996,28 @@ export default function PortfolioPage() {
                     : []
             );
 
-            setSkills(
-                Array.isArray(portfolio.skills)
-                    ? portfolio.skills
-                        .map((item: any) => ({
-                            id: item.id || makeId("skill"),
-                            name: item.name || "",
-                            kind: normalizeSkillKind(item.kind),
-                            source: normalizeSource(item.source),
-                            isSelected: typeof item.isSelected === "boolean" ? item.isSelected : true,
-                        }))
-                        .filter((item: SkillItem) => item.name)
-                    : []
-            );
+            {
+                const seenSkillNames = new Set<string>();
+                setSkills(
+                    Array.isArray(portfolio.skills)
+                        ? portfolio.skills
+                            .map((item: any) => ({
+                                id: item.id || makeId("skill"),
+                                name: item.name || "",
+                                kind: normalizeSkillKind(item.kind),
+                                source: normalizeSource(item.source),
+                                isSelected: typeof item.isSelected === "boolean" ? item.isSelected : true,
+                            }))
+                            .filter((item: SkillItem) => {
+                                if (!item.name) return false;
+                                const key = `${item.name.toLowerCase()}|${item.kind}`;
+                                if (seenSkillNames.has(key)) return false;
+                                seenSkillNames.add(key);
+                                return true;
+                            })
+                        : []
+                );
+            }
 
             setCertificates(
                 Array.isArray(portfolio.certificates)
@@ -1014,40 +1028,52 @@ export default function PortfolioPage() {
                             date: normalizeDate(item.date),
                             itemType: (item.itemType === "badge" ? "badge" : "certificate") as "certificate" | "badge",
                             badgeLink: item.badgeLink || "",
+                            source: normalizeSource(item.source ?? (item.fromSystem === true ? "platform" : "upload")),
+                            isSelected: typeof item.isSelected === "boolean"
+                                ? item.isSelected
+                                : typeof item.enable === "boolean"
+                                    ? item.enable
+                                    : true,
                         }))
                         .filter((item: CertificateItem) => item.title)
                     : []
             );
 
-            setExperiences(
-                Array.isArray(portfolio.experiences)
-                    ? portfolio.experiences
-                        .map((item: any) => ({
-                            id: item.id || makeId("experience"),
-                            period: item.period || "",
-                            title: item.title || "",
-                            description: item.description || "",
-                            source: normalizeSource(item.source),
-                            files: [],
-                        }))
-                        .filter((item: ExperienceItem) => item.title)
-                    : []
-            );
+            {
+                // route.ts ส่ง enable field กลับมาด้วย
+                // enabled items (platform enable=true + upload ทั้งหมด) → "Current items"
+                // platform items ทั้งหมด (enable=true/false) → allPlatformExperiences
+                const enabledExp: ExperienceItem[] = [];
+                const allPlatformExp: ExperienceItem[] = [];
+                const seenIds = new Set<string>();
 
-            // platform activities from backend (completed activities)
-            if (Array.isArray(portfolio.platform_activities)) {
-                setApiPlatformExperiences(
-                    portfolio.platform_activities
-                        .map((item: any) => ({
-                            id: item.id || item.activity_id || makeId("platform-exp"),
-                            period: item.period || "",
-                            title: item.title || item.activity_name || item.name || "",
-                            description: item.description || "",
-                            source: "platform" as ItemSource,
-                            files: [],
-                        }))
-                        .filter((item: ExperienceItem) => item.title)
-                );
+                (portfolio.experiences ?? []).forEach((item: any) => {
+                    if (!item.title || item.title === "string") return;
+                    if (seenIds.has(item.id)) return;
+                    seenIds.add(item.id);
+
+                    const normalized: ExperienceItem = {
+                        id: item.id || makeId("experience"),
+                        period: item.period || "",
+                        title: item.title || "",
+                        description: item.description || "",
+                        source: normalizeSource(item.source),
+                        files: [],
+                    };
+
+                    const isEnabled = typeof item.enable === "boolean" ? item.enable : true;
+
+                    if (normalized.source === "platform") {
+                        allPlatformExp.push(normalized);
+                        if (isEnabled) enabledExp.push(normalized);
+                    } else {
+                        // upload items always go to current
+                        enabledExp.push(normalized);
+                    }
+                });
+
+                setExperiences(enabledExp);
+                setAllPlatformExperiences(allPlatformExp);
             }
         } catch (error) {
             console.error("Failed to fetch portfolio:", error);
@@ -1058,6 +1084,8 @@ export default function PortfolioPage() {
             setSkills([]);
             setCertificates([]);
             setExperiences([]);
+            setAllPlatformExperiences([]);
+            setPhotoUrl("");
         } finally {
             setIsLoading(false);
         }
@@ -1251,7 +1279,9 @@ export default function PortfolioPage() {
                                 <div className={styles.sectionEditorGroup}>
                                     <div className={styles.sectionEditorHeading}>Current items</div>
                                     <div className={styles.sectionEditorList}>
-                                        {skills.map((item, index) => (
+                                        {skills.filter((item) => item.source === "upload" || item.isSelected).map((item, index) => {
+                                            const realIndex = skills.indexOf(item);
+                                            return (
                                             <div key={item.id} className={styles.sectionEditorRow}>
                                                 <div className={styles.sectionEditorTextWrap}>
                                                     <img src={getSourceIcon(item.source)} alt={getSourceLabel(item.source)} className={styles.inlineSourceIcon} />
@@ -1267,23 +1297,24 @@ export default function PortfolioPage() {
                                                     <button
                                                         type="button"
                                                         className={`${styles.skillCheckBtn} ${item.isSelected ? styles.skillCheckBtnActive : ""}`}
-                                                        onClick={() => onToggleSkillSelected(index)}
+                                                        onClick={() => onToggleSkillSelected(realIndex)}
                                                         aria-label={item.isSelected ? "Hide from portfolio" : "Show in portfolio"}
                                                         title={item.isSelected ? "Showing in portfolio" : "Hidden from portfolio"}
                                                     >
                                                         {item.isSelected ? "✓" : ""}
                                                     </button>
 
-                                                    <button type="button" className={styles.educationEditBtn} onClick={() => onEditSkill(index)}>
+                                                    <button type="button" className={styles.educationEditBtn} onClick={() => onEditSkill(realIndex)}>
                                                         <img src="/images/icons/button03-icon.png" alt="Edit" className={styles.educationBtnIcon} />
                                                     </button>
 
-                                                    <button type="button" className={styles.educationDeleteBtn} onClick={() => askDelete("skills", index)}>
+                                                    <button type="button" className={styles.educationDeleteBtn} onClick={() => askDelete("skills", realIndex)}>
                                                         <img src="/images/icons/button04-icon.png" alt="Delete" className={styles.educationBtnIcon} />
                                                     </button>
                                                 </div>
                                             </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 </div>
 
@@ -1369,8 +1400,11 @@ export default function PortfolioPage() {
                                 <div className={styles.sectionEditorGroup}>
                                     <div className={styles.sectionEditorHeading}>Current items</div>
                                     <div className={styles.sectionEditorList}>
-                                        {certificates.map((item, index) => (
-                                            <div key={item.id} className={styles.sectionEditorRow}>
+                                        {certificates.map((item, index) => {
+                                            if (item.source === "platform" && !item.isSelected) return null;
+
+                                            return (
+                                                <div key={item.id} className={styles.sectionEditorRow}>
                                                 <div className={styles.sectionEditorTextWrap}>
                                                     <div className={styles.sectionEditorTextBlock}>
                                                         <div className={styles.sectionEditorTitle}>{item.title}</div>
@@ -1388,8 +1422,9 @@ export default function PortfolioPage() {
                                                 <button type="button" className={styles.educationDeleteBtn} onClick={() => askDelete("certificate", index)}>
                                                     <img src="/images/icons/button04-icon.png" alt="Delete" className={styles.educationBtnIcon} />
                                                 </button>
-                                            </div>
-                                        ))}
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
 
@@ -1528,16 +1563,11 @@ export default function PortfolioPage() {
                                 <div className={styles.sectionEditorGroup}>
                                     <div className={styles.sectionEditorHeading}>Select from platform</div>
                                     <div className={styles.optionList}>
-                                        {apiPlatformExperiences.length === 0 && (
-                                            <div className={styles.optionMeta} style={{ padding: "8px 0", color: "#8a827b" }}>
-                                                ยังไม่มีกิจกรรมที่เสร็จสมบูรณ์จากแพลตฟอร์ม
-                                            </div>
-                                        )}
-                                        {apiPlatformExperiences.map((item) => (
+                                        {platformExperienceOptions.map((item) => (
                                             <button key={item.id} type="button" className={styles.optionCardTall} onClick={() => onSelectPlatformExperience(item)}>
                                                 <img src={getSourceIcon("platform")} alt="Platform" className={styles.inlineSourceIcon} />
                                                 <div className={styles.optionTextBlock}>
-                                                    <div className={styles.optionTitle}>{item.period ? `[${item.period}] - ` : ""}{item.title}</div>
+                                                    <div className={styles.optionTitle}>[{item.period}] - {item.title}</div>
                                                     <div className={styles.optionMeta}>{item.description}</div>
                                                 </div>
                                             </button>
@@ -1710,11 +1740,11 @@ export default function PortfolioPage() {
                                 <div className={styles.blockTitle}>Badge and Certificate</div>
                             </div>
                             <div className={styles.blockBody}>
-                                {certificates.filter((c) => c.itemType === "certificate").length > 0 && (
+                                {visibleCertificates.filter((c) => c.itemType === "certificate").length > 0 && (
                                     <>
                                         <div className={styles.blockSubTitle}>Certificates</div>
                                         <div className={styles.list}>
-                                            {certificates.filter((c) => c.itemType === "certificate").map((item) => (
+                                            {visibleCertificates.filter((c) => c.itemType === "certificate").map((item) => (
                                                 <div key={item.id} className={styles.listItem}>
                                                     <span className={styles.listText}>- {item.title} ({item.date})</span>
                                                 </div>
@@ -1722,11 +1752,11 @@ export default function PortfolioPage() {
                                         </div>
                                     </>
                                 )}
-                                {certificates.filter((c) => c.itemType === "badge").length > 0 && (
+                                {visibleCertificates.filter((c) => c.itemType === "badge").length > 0 && (
                                     <>
                                         <div className={styles.blockSubTitle}>Badges</div>
                                         <div className={styles.list}>
-                                            {certificates.filter((c) => c.itemType === "badge").map((item) => (
+                                            {visibleCertificates.filter((c) => c.itemType === "badge").map((item) => (
                                                 <div key={item.id} className={styles.listItem}>
                                                     <span className={styles.listText}>- {item.title} ({item.date})</span>
                                                 </div>
