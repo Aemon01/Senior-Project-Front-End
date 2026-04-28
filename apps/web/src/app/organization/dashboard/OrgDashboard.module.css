@@ -3596,3 +3596,440 @@
     grid-template-columns: 1fr !important;
   }
 }
+
+/* ===== FIX: Organization participant popup uses the same portfolio preview CSS as student portfolio ===== */
+.participantPortfolioCard {
+  position: relative !important;
+  width: min(900px, calc(100vw - 48px)) !important;
+  height: min(760px, calc(100dvh - 48px)) !important;
+  background: #fefefe !important;
+  border: 1.5px solid #000 !important;
+  border-radius: 6px !important;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.2) !important;
+  padding: 26px 34px 30px !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  font-family: "Rounded Mplus 1c", Inter, Arial, sans-serif !important;
+}
+
+.participantPortfolioScroll {
+  height: 100% !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding: 0 12px 4px 0 !important;
+  box-sizing: border-box !important;
+}
+
+.participantPortfolioScroll::-webkit-scrollbar { width: 8px; }
+.participantPortfolioScroll::-webkit-scrollbar-thumb { background: #717171; border-radius: 999px; }
+.participantPortfolioScroll::-webkit-scrollbar-track { background: #efefef; }
+
+.participantPortfolioTopSection {
+  display: grid !important;
+  grid-template-columns: 178px minmax(0, 1fr) !important;
+  gap: 24px !important;
+  align-items: stretch !important;
+  margin: 0 46px 18px 0 !important;
+}
+
+.participantPortfolioPhotoCard {
+  width: 178px !important;
+  height: 178px !important;
+  padding: 0 !important;
+  border: 1px solid #efefef !important;
+  border-radius: 2px !important;
+  background: #fefefe !important;
+  box-shadow: 1px 1px 4px rgba(0, 0, 0, 0.1) !important;
+  overflow: hidden !important;
+}
+
+.participantPortfolioPhotoFrame {
+  position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+.participantPortfolioPhoto {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  object-position: center !important;
+  display: block !important;
+}
+
+.participantPortfolioInitials {
+  width: 100% !important;
+  height: 100% !important;
+  display: grid !important;
+  place-items: center !important;
+  font-size: 42px !important;
+  font-weight: 800 !important;
+  color: #2a2a2a !important;
+}
+
+.participantPortfolioAboutCard {
+  min-height: 178px !important;
+  position: relative !important;
+  background: #fefefe !important;
+  border: 1px solid #efefef !important;
+  border-radius: 2px !important;
+  box-shadow: 1px 1px 4px rgba(0, 0, 0, 0.1) !important;
+  padding: 22px 28px 16px !important;
+  box-sizing: border-box !important;
+}
+
+.participantPortfolioName {
+  font-size: 28px !important;
+  font-weight: 500 !important;
+  line-height: 1.1 !important;
+  margin-bottom: 12px !important;
+  color: #000 !important;
+}
+
+.participantPortfolioAboutText {
+  width: 100% !important;
+  min-height: 64px !important;
+  max-height: 86px !important;
+  overflow: hidden !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 3 !important;
+  -webkit-box-orient: vertical !important;
+  font-size: 15px !important;
+  line-height: 1.45 !important;
+  margin-bottom: 14px !important;
+  color: #000 !important;
+}
+
+.participantPortfolioInfoGrid {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 8px 18px !important;
+  padding-top: 10px !important;
+  border-top: 1px solid #000 !important;
+  font-size: 12px !important;
+  line-height: 1.25 !important;
+}
+
+.participantPortfolioInfoGrid span { font-weight: 500 !important; }
+
+.participantPortfolioFullRow {
+  grid-column: 1 / -1 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.participantPortfolioBlock,
+.participantPortfolioSkillsSplit {
+  width: 100% !important;
+  background: transparent !important;
+  margin-bottom: 12px !important;
+}
+
+.participantPortfolioBlockHeader {
+  padding-left: 17px !important;
+  margin-bottom: 0 !important;
+}
+
+.participantPortfolioBlockTitle {
+  font-size: 22px !important;
+  font-weight: 500 !important;
+  line-height: 36px !important;
+  color: #000 !important;
+}
+
+.participantPortfolioBlockSubTitle {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: #555 !important;
+  margin: 6px 0 2px 0 !important;
+  padding-left: 4px !important;
+}
+
+.participantPortfolioBlockBody {
+  background: #fefefe !important;
+  border: 1px solid #efefef !important;
+  border-radius: 2px !important;
+  box-shadow: 1px 1px 4px rgba(0, 0, 0, 0.1) !important;
+  border-top: 1px solid #000 !important;
+  padding: 9px 17px 11px !important;
+  box-sizing: border-box !important;
+}
+
+.participantPortfolioSimpleLine {
+  font-size: 16px !important;
+  line-height: 1.5 !important;
+  min-height: 25px !important;
+}
+
+.participantPortfolioSkillsHeaderRow {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  padding: 0 20px !important;
+  margin-bottom: 0 !important;
+}
+
+.participantPortfolioSkillsTitle {
+  font-size: 22px !important;
+  font-weight: 500 !important;
+  line-height: 36px !important;
+}
+
+.participantPortfolioSkillsBody {
+  position: relative !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr) !important;
+  column-gap: 18px !important;
+  background: #fefefe !important;
+  border: 1px solid #efefef !important;
+  border-radius: 2px !important;
+  box-shadow: 1px 1px 4px rgba(0, 0, 0, 0.1) !important;
+  border-top: 1px solid #000 !important;
+  min-height: 119px !important;
+  padding: 14px 20px 12px !important;
+  box-sizing: border-box !important;
+  align-items: start !important;
+}
+
+.participantPortfolioSkillsDivider {
+  width: 1px !important;
+  height: 100% !important;
+  background: #000 !important;
+  margin: 0 !important;
+  justify-self: center !important;
+}
+
+.participantPortfolioSkillsColumn {
+  min-width: 0 !important;
+  max-height: 92px !important;
+  overflow-y: auto !important;
+  padding-right: 14px !important;
+  box-sizing: border-box !important;
+}
+
+.participantPortfolioSkillsColumn::-webkit-scrollbar { width: 7px; }
+.participantPortfolioSkillsColumn::-webkit-scrollbar-thumb { background: #717171; border-radius: 999px; }
+
+.participantPortfolioSkillLine {
+  font-size: 14px !important;
+  line-height: 19px !important;
+  min-height: 19px !important;
+  font-family: Inter, Arial, sans-serif !important;
+  white-space: nowrap !important;
+}
+
+.participantPortfolioList,
+.participantPortfolioExpList {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+}
+
+.participantPortfolioSourceIcon,
+.participantInlineSourceIcon {
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  object-fit: contain !important;
+  display: block !important;
+  margin-top: 2px !important;
+}
+
+.participantFileListItemWrap { position: relative !important; width: 100% !important; }
+
+.participantFileListItem {
+  position: relative !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 8px !important;
+  min-height: 19px !important;
+  font-size: 14px !important;
+  line-height: 19px !important;
+  font-family: Inter, Arial, sans-serif !important;
+  cursor: pointer !important;
+  outline: none !important;
+}
+
+.participantFileListItem:hover .participantFileHoverPopup,
+.participantFileListItem:focus .participantFileHoverPopup {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: translateY(0) !important;
+  pointer-events: auto !important;
+}
+
+.participantFileHoverPopup {
+  position: absolute !important;
+  top: calc(100% + 6px) !important;
+  left: 22px !important;
+  z-index: 30 !important;
+  width: min(280px, calc(100vw - 48px)) !important;
+  padding: 10px 12px !important;
+  border: 1.5px solid rgba(0, 0, 0, 0.45) !important;
+  border-radius: 4px !important;
+  background: #fff !important;
+  box-shadow: 2px 3px 8px rgba(0, 0, 0, 0.16) !important;
+  box-sizing: border-box !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  transform: translateY(-4px) !important;
+  transition: opacity 120ms ease, transform 120ms ease, visibility 120ms ease !important;
+}
+
+.participantFileHoverPopup::before {
+  content: "" !important;
+  position: absolute !important;
+  top: -7px !important;
+  left: 18px !important;
+  width: 12px !important;
+  height: 12px !important;
+  background: #fff !important;
+  border-left: 1.5px solid rgba(0, 0, 0, 0.45) !important;
+  border-top: 1.5px solid rgba(0, 0, 0, 0.45) !important;
+  transform: rotate(45deg) !important;
+}
+
+.participantFilePopupTitle {
+  font-size: 12px !important;
+  line-height: 1.25 !important;
+  color: rgba(0, 0, 0, 0.62) !important;
+  margin-bottom: 4px !important;
+}
+
+.participantFilePopupName {
+  font-size: 13px !important;
+  line-height: 1.35 !important;
+  color: #000 !important;
+  word-break: break-word !important;
+  margin-bottom: 5px !important;
+}
+
+.participantFilePopupHint {
+  font-size: 11px !important;
+  line-height: 1.3 !important;
+  color: #347464 !important;
+}
+
+.participantInlineFilePreview {
+  width: 100% !important;
+  margin: 7px 0 8px !important;
+  padding: 8px !important;
+  border: 1.5px solid rgba(0, 0, 0, 0.32) !important;
+  border-radius: 3px !important;
+  background: #fff !important;
+  box-shadow: 1px 1px 4px rgba(0, 0, 0, 0.08) !important;
+  box-sizing: border-box !important;
+}
+
+.participantInlineFileHeader {
+  min-height: 28px !important;
+  display: grid !important;
+  grid-template-columns: 16px minmax(0, 1fr) auto !important;
+  gap: 8px !important;
+  align-items: center !important;
+  margin-bottom: 7px !important;
+}
+
+.participantInlineFileName {
+  min-width: 0 !important;
+  font-size: 12px !important;
+  line-height: 1.25 !important;
+  color: #000 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.participantInlineFileOpenLink {
+  min-width: 48px !important;
+  height: 24px !important;
+  padding: 0 10px !important;
+  border: 1.5px solid #000 !important;
+  border-radius: 2px !important;
+  background: #f5f5f5 !important;
+  color: #000 !important;
+  font-size: 12px !important;
+  line-height: 22px !important;
+  text-align: center !important;
+  text-decoration: none !important;
+  box-sizing: border-box !important;
+}
+
+.participantInlineFileImage {
+  width: 100% !important;
+  max-height: 185px !important;
+  object-fit: contain !important;
+  display: block !important;
+  background: #f7f7f7 !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+}
+
+.participantInlineFileFrame {
+  width: 100% !important;
+  height: 220px !important;
+  display: block !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  background: #f7f7f7 !important;
+}
+
+.participantInlineFileFallback {
+  min-height: 54px !important;
+  padding: 12px !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  background: #f7f7f7 !important;
+  color: rgba(0, 0, 0, 0.72) !important;
+  font-size: 12px !important;
+  line-height: 1.45 !important;
+  box-sizing: border-box !important;
+}
+
+.participantPortfolioExpItem {
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.participantPortfolioExpTop {
+  display: grid !important;
+  grid-template-columns: 16px auto 1fr !important;
+  gap: 5px !important;
+  align-items: start !important;
+  margin-bottom: 4px !important;
+  font-size: 14px !important;
+  line-height: 19px !important;
+  font-family: Inter, Arial, sans-serif !important;
+}
+
+.participantPortfolioExpDesc {
+  padding-left: 19px !important;
+  font-size: 11px !important;
+  line-height: 1.45 !important;
+  color: #000 !important;
+}
+
+.participantPortfolioEmpty {
+  font-family: Inter, Arial, sans-serif !important;
+  font-size: 13px !important;
+  line-height: 1.45 !important;
+  color: rgba(0, 0, 0, 0.48) !important;
+}
+
+@media (max-width: 760px) {
+  .participantPortfolioCard {
+    width: calc(100vw - 32px) !important;
+    height: calc(100dvh - 32px) !important;
+    padding: 22px 20px 24px !important;
+  }
+
+  .participantPortfolioTopSection,
+  .participantPortfolioSkillsBody,
+  .participantPortfolioSkillsHeaderRow {
+    grid-template-columns: 1fr !important;
+  }
+
+  .participantPortfolioTopSection { margin-right: 38px !important; }
+  .participantPortfolioSkillsDivider { display: none !important; }
+}
